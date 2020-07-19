@@ -1,0 +1,419 @@
+<?xml version="1.0" standalone="no"?><!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd"><svg version="1.1" width="1200" height="374" onload="init(evt)" viewBox="0 0 1200 374" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><!--Flame graph stack visualization. See https://github.com/brendangregg/FlameGraph for latest version, and http://www.brendangregg.com/flamegraphs.html for examples.--><!--NOTES: --><defs><linearGradient id="background" y1="0" y2="1" x1="0" x2="0"><stop stop-color="#eeeeee" offset="5%"/><stop stop-color="#eeeeb0" offset="95%"/></linearGradient></defs><style type="text/css">
+text { font-family:"Verdana"; font-size:12px; fill:rgb(0,0,0); }
+#title { text-anchor:middle; font-size:17px; }
+#search { opacity:0.1; cursor:pointer; }
+#search:hover, #search.show { opacity:1; }
+#subtitle { text-anchor:middle; font-color:rgb(160,160,160); }
+#unzoom { cursor:pointer; }
+#frames > *:hover { stroke:black; stroke-width:0.5; cursor:pointer; }
+.hide { display:none; }
+.parent { opacity:0.5; }
+</style><script type="text/ecmascript"><![CDATA[var nametype = 'Function:';
+var fontsize = 12;
+var fontwidth = 0.59;
+var xpad = 10;
+var inverted = false;
+var searchcolor = 'rgb(230,0,230)';
+var fluiddrawing = true;
+var truncate_text_right = false;]]><![CDATA["use strict";
+var details, searchbtn, unzoombtn, matchedtxt, svg, searching, frames;
+function init(evt) {
+    details = document.getElementById("details").firstChild;
+    searchbtn = document.getElementById("search");
+    unzoombtn = document.getElementById("unzoom");
+    matchedtxt = document.getElementById("matched");
+    svg = document.getElementsByTagName("svg")[0];
+    frames = document.getElementById("frames");
+    searching = 0;
+
+    // Use GET parameters to restore a flamegraph's state.
+    var restore_state = function() {
+        var params = get_params();
+        if (params.x && params.y)
+            zoom(find_group(document.querySelector('[x="' + params.x + '"][y="' + params.y + '"]')));
+        if (params.s)
+            search(params.s);
+    };
+
+    if (fluiddrawing) {
+        // Make width dynamic so the SVG fits its parent's width.
+        svg.removeAttribute("width");
+        // Edge requires us to have a viewBox that gets updated with size changes.
+        var isEdge = /Edge\/\d./i.test(navigator.userAgent);
+        if (!isEdge) {
+          svg.removeAttribute("viewBox");
+        }
+        var update_for_width_change = function() {
+            if (isEdge) {
+                svg.attributes.viewBox.value = "0 0 " + svg.width.baseVal.value + " " + svg.height.baseVal.value;
+            }
+
+            // Keep consistent padding on left and right of frames container.
+            frames.attributes.width.value = svg.width.baseVal.value - xpad * 2;
+
+            // Text truncation needs to be adjusted for the current width.
+            var el = frames.children;
+            for(var i = 0; i < el.length; i++) {
+                update_text(el[i]);
+            }
+
+            // Keep search elements at a fixed distance from right edge.
+            var svgWidth = svg.width.baseVal.value;
+            searchbtn.attributes.x.value = svgWidth - xpad - 100;
+            matchedtxt.attributes.x.value = svgWidth - xpad - 100;
+        };
+        window.addEventListener('resize', function() {
+            update_for_width_change();
+        });
+        // This needs to be done asynchronously for Safari to work.
+        setTimeout(function() {
+            unzoom();
+            update_for_width_change();
+            restore_state();
+        }, 0);
+    } else {
+        restore_state();
+    }
+}
+// event listeners
+window.addEventListener("click", function(e) {
+    var target = find_group(e.target);
+    if (target) {
+        if (target.nodeName == "a") {
+            if (e.ctrlKey === false) return;
+            e.preventDefault();
+        }
+        if (target.classList.contains("parent")) unzoom();
+        zoom(target);
+
+        // set parameters for zoom state
+        var el = target.querySelector("rect");
+        if (el && el.attributes && el.attributes.y && el.attributes._orig_x) {
+            var params = get_params()
+            params.x = el.attributes._orig_x.value;
+            params.y = el.attributes.y.value;
+            history.replaceState(null, null, parse_params(params));
+        }
+    }
+    else if (e.target.id == "unzoom") {
+        unzoom();
+
+        // remove zoom state
+        var params = get_params();
+        if (params.x) delete params.x;
+        if (params.y) delete params.y;
+        history.replaceState(null, null, parse_params(params));
+    }
+    else if (e.target.id == "search") search_prompt();
+}, false)
+// mouse-over for info
+// show
+window.addEventListener("mouseover", function(e) {
+    var target = find_group(e.target);
+    if (target) details.nodeValue = nametype + " " + g_to_text(target);
+}, false)
+// clear
+window.addEventListener("mouseout", function(e) {
+    var target = find_group(e.target);
+    if (target) details.nodeValue = ' ';
+}, false)
+// ctrl-F for search
+window.addEventListener("keydown",function (e) {
+    if (e.keyCode === 114 || (e.ctrlKey && e.keyCode === 70)) {
+        e.preventDefault();
+        search_prompt();
+    }
+}, false)
+// functions
+function get_params() {
+    var params = {};
+    var paramsarr = window.location.search.substr(1).split('&');
+    for (var i = 0; i < paramsarr.length; ++i) {
+        var tmp = paramsarr[i].split("=");
+        if (!tmp[0] || !tmp[1]) continue;
+        params[tmp[0]]  = decodeURIComponent(tmp[1]);
+    }
+    return params;
+}
+function parse_params(params) {
+    var uri = "?";
+    for (var key in params) {
+        uri += key + '=' + encodeURIComponent(params[key]) + '&';
+    }
+    if (uri.slice(-1) == "&")
+        uri = uri.substring(0, uri.length - 1);
+    if (uri == '?')
+        uri = window.location.href.split('?')[0];
+    return uri;
+}
+function find_child(node, selector) {
+    var children = node.querySelectorAll(selector);
+    if (children.length) return children[0];
+    return;
+}
+function find_group(node) {
+    var parent = node.parentElement;
+    if (!parent) return;
+    if (parent.id == "frames") return node;
+    return find_group(parent);
+}
+function orig_save(e, attr, val) {
+    if (e.attributes["_orig_" + attr] != undefined) return;
+    if (e.attributes[attr] == undefined) return;
+    if (val == undefined) val = e.attributes[attr].value;
+    e.setAttribute("_orig_" + attr, val);
+}
+function orig_load(e, attr) {
+    if (e.attributes["_orig_"+attr] == undefined) return;
+    e.attributes[attr].value = e.attributes["_orig_" + attr].value;
+    e.removeAttribute("_orig_" + attr);
+}
+function g_to_text(e) {
+    var text = find_child(e, "title").firstChild.nodeValue;
+    return (text)
+}
+function g_to_func(e) {
+    var func = g_to_text(e);
+    // if there's any manipulation we want to do to the function
+    // name before it's searched, do it here before returning.
+    return (func);
+}
+function update_text(e) {
+    var r = find_child(e, "rect");
+    var t = find_child(e, "text");
+    var w = parseFloat(r.attributes.width.value) * frames.attributes.width.value / 100 - 3;
+    var txt = find_child(e, "title").textContent.replace(/\([^(]*\)$/,"");
+    t.attributes.x.value = format_percent((parseFloat(r.attributes.x.value) + (100 * 3 / frames.attributes.width.value)));
+    // Smaller than this size won't fit anything
+    if (w < 2 * fontsize * fontwidth) {
+        t.textContent = "";
+        return;
+    }
+    t.textContent = txt;
+    // Fit in full text width
+    if (/^ *\$/.test(txt) || t.getComputedTextLength() < w)
+        return;
+    if (truncate_text_right) {
+        // Truncate the right side of the text.
+        for (var x = txt.length - 2; x > 0; x--) {
+            if (t.getSubStringLength(0, x + 2) <= w) {
+                t.textContent = txt.substring(0, x) + "..";
+                return;
+            }
+        }
+    } else {
+        // Truncate the left side of the text.
+        for (var x = 2; x < txt.length; x++) {
+            if (t.getSubStringLength(x - 2, txt.length) <= w) {
+                t.textContent = ".." + txt.substring(x, txt.length);
+                return;
+            }
+        }
+    }
+    t.textContent = "";
+}
+// zoom
+function zoom_reset(e) {
+    if (e.attributes != undefined) {
+        orig_load(e, "x");
+        orig_load(e, "width");
+    }
+    if (e.childNodes == undefined) return;
+    for(var i = 0, c = e.childNodes; i < c.length; i++) {
+        zoom_reset(c[i]);
+    }
+}
+function zoom_child(e, x, ratio) {
+    if (e.attributes != undefined) {
+        if (e.attributes.x != undefined) {
+            orig_save(e, "x");
+            e.attributes.x.value = format_percent((parseFloat(e.attributes.x.value) - x) * ratio);
+            if (e.tagName == "text") {
+                e.attributes.x.value = format_percent(parseFloat(find_child(e.parentNode, "rect[x]").attributes.x.value) + (100 * 3 / frames.attributes.width.value));
+            }
+        }
+        if (e.attributes.width != undefined) {
+            orig_save(e, "width");
+            e.attributes.width.value = format_percent(parseFloat(e.attributes.width.value) * ratio);
+        }
+    }
+    if (e.childNodes == undefined) return;
+    for(var i = 0, c = e.childNodes; i < c.length; i++) {
+        zoom_child(c[i], x, ratio);
+    }
+}
+function zoom_parent(e) {
+    if (e.attributes) {
+        if (e.attributes.x != undefined) {
+            orig_save(e, "x");
+            e.attributes.x.value = "0.0%";
+        }
+        if (e.attributes.width != undefined) {
+            orig_save(e, "width");
+            e.attributes.width.value = "100.0%";
+        }
+    }
+    if (e.childNodes == undefined) return;
+    for(var i = 0, c = e.childNodes; i < c.length; i++) {
+        zoom_parent(c[i]);
+    }
+}
+function zoom(node) {
+    var attr = find_child(node, "rect").attributes;
+    var width = parseFloat(attr.width.value);
+    var xmin = parseFloat(attr.x.value);
+    var xmax = xmin + width;
+    var ymin = parseFloat(attr.y.value);
+    var ratio = 100 / width;
+    // XXX: Workaround for JavaScript float issues (fix me)
+    var fudge = 0.001;
+    unzoombtn.classList.remove("hide");
+    var el = frames.children;
+    for (var i = 0; i < el.length; i++) {
+        var e = el[i];
+        var a = find_child(e, "rect").attributes;
+        var ex = parseFloat(a.x.value);
+        var ew = parseFloat(a.width.value);
+        // Is it an ancestor
+        if (!inverted) {
+            var upstack = parseFloat(a.y.value) > ymin;
+        } else {
+            var upstack = parseFloat(a.y.value) < ymin;
+        }
+        if (upstack) {
+            // Direct ancestor
+            if (ex <= xmin && (ex+ew+fudge) >= xmax) {
+                e.classList.add("parent");
+                zoom_parent(e);
+                update_text(e);
+            }
+            // not in current path
+            else
+                e.classList.add("hide");
+        }
+        // Children maybe
+        else {
+            // no common path
+            if (ex < xmin || ex + fudge >= xmax) {
+                e.classList.add("hide");
+            }
+            else {
+                zoom_child(e, xmin, ratio);
+                update_text(e);
+            }
+        }
+    }
+}
+function unzoom() {
+    unzoombtn.classList.add("hide");
+    var el = frames.children;
+    for(var i = 0; i < el.length; i++) {
+        el[i].classList.remove("parent");
+        el[i].classList.remove("hide");
+        zoom_reset(el[i]);
+        update_text(el[i]);
+    }
+}
+// search
+function reset_search() {
+    var el = document.querySelectorAll("#frames rect");
+    for (var i = 0; i < el.length; i++) {
+        orig_load(el[i], "fill")
+    }
+    var params = get_params();
+    delete params.s;
+    history.replaceState(null, null, parse_params(params));
+}
+function search_prompt() {
+    if (!searching) {
+        var term = prompt("Enter a search term (regexp " +
+            "allowed, eg: ^ext4_)", "");
+        if (term != null) {
+            search(term)
+        }
+    } else {
+        reset_search();
+        searching = 0;
+        searchbtn.classList.remove("show");
+        searchbtn.firstChild.nodeValue = "Search"
+        matchedtxt.classList.add("hide");
+        matchedtxt.firstChild.nodeValue = ""
+    }
+}
+function search(term) {
+    var re = new RegExp(term);
+    var el = frames.children;
+    var matches = new Object();
+    var maxwidth = 0;
+    for (var i = 0; i < el.length; i++) {
+        var e = el[i];
+        var func = g_to_func(e);
+        var rect = find_child(e, "rect");
+        if (func == null || rect == null)
+            continue;
+        // Save max width. Only works as we have a root frame
+        var w = parseFloat(rect.attributes.width.value);
+        if (w > maxwidth)
+            maxwidth = w;
+        if (func.match(re)) {
+            // highlight
+            var x = parseFloat(rect.attributes.x.value);
+            orig_save(rect, "fill");
+            rect.attributes.fill.value = searchcolor;
+            // remember matches
+            if (matches[x] == undefined) {
+                matches[x] = w;
+            } else {
+                if (w > matches[x]) {
+                    // overwrite with parent
+                    matches[x] = w;
+                }
+            }
+            searching = 1;
+        }
+    }
+    if (!searching)
+        return;
+    var params = get_params();
+    params.s = term;
+    history.replaceState(null, null, parse_params(params));
+
+    searchbtn.classList.add("show");
+    searchbtn.firstChild.nodeValue = "Reset Search";
+    // calculate percent matched, excluding vertical overlap
+    var count = 0;
+    var lastx = -1;
+    var lastw = 0;
+    var keys = Array();
+    for (k in matches) {
+        if (matches.hasOwnProperty(k))
+            keys.push(k);
+    }
+    // sort the matched frames by their x location
+    // ascending, then width descending
+    keys.sort(function(a, b){
+        return a - b;
+    });
+    // Step through frames saving only the biggest bottom-up frames
+    // thanks to the sort order. This relies on the tree property
+    // where children are always smaller than their parents.
+    var fudge = 0.0001;    // JavaScript floating point
+    for (var k in keys) {
+        var x = parseFloat(keys[k]);
+        var w = matches[keys[k]];
+        if (x >= lastx + lastw - fudge) {
+            count += w;
+            lastx = x;
+            lastw = w;
+        }
+    }
+    // display matched percent
+    matchedtxt.classList.remove("hide");
+    var pct = 100 * count / maxwidth;
+    if (pct != 100) pct = pct.toFixed(1);
+    matchedtxt.firstChild.nodeValue = "Matched: " + pct + "%";
+}
+function format_percent(n) {
+    return n.toFixed(4) + "%";
+}
+]]></script><rect x="0" y="0" width="100%" height="374" fill="url(#background)"/><text id="title" x="50.0000%" y="24.00">Flame Graph</text><text id="details" x="10" y="357.00"> </text><text id="unzoom" class="hide" x="10" y="24.00">Reset Zoom</text><text id="search" x="1090" y="24.00">Search</text><text id="matched" x="1090" y="357.00"> </text><svg id="frames" x="10" width="1180"><g><title>libsystem_m.dylib`round (3,609 samples, 2.61%)</title><rect x="0.0014%" y="197" width="2.6074%" height="15" fill="rgb(227,0,7)"/><text x="0.2514%" y="207.50">li..</text></g><g><title>libsystem_m.dylib`0x00007fff7331f1c7 (374 samples, 0.27%)</title><rect x="4.3464%" y="181" width="0.2702%" height="15" fill="rgb(217,0,24)"/><text x="4.5964%" y="191.50"></text></g><g><title>raytracer`DYLD-STUB$$fma (252 samples, 0.18%)</title><rect x="4.6924%" y="181" width="0.1821%" height="15" fill="rgb(221,193,54)"/><text x="4.9424%" y="191.50"></text></g><g><title>raytracer`alloc::slice::_&lt;impl [T]&gt;::repeat (606 samples, 0.44%)</title><rect x="4.9114%" y="181" width="0.4378%" height="15" fill="rgb(248,212,6)"/><text x="5.1614%" y="191.50"></text></g><g><title>libsystem_platform.dylib`_platform_memmove$VARIANT$Haswell (606 samples, 0.44%)</title><rect x="4.9114%" y="165" width="0.4378%" height="15" fill="rgb(208,68,35)"/><text x="5.1614%" y="175.50"></text></g><g><title>raytracer`raytracer::matrix::Matrix::multiply_tuple (2,010 samples, 1.45%)</title><rect x="5.3615%" y="181" width="1.4522%" height="15" fill="rgb(232,128,0)"/><text x="5.6115%" y="191.50"></text></g><g><title>libsystem_m.dylib`0x00007fff7331f1c7 (763 samples, 0.55%)</title><rect x="6.2624%" y="165" width="0.5512%" height="15" fill="rgb(207,160,47)"/><text x="6.5124%" y="175.50"></text></g><g><title>libsystem_malloc.dylib`szone_size (417 samples, 0.30%)</title><rect x="7.3974%" y="149" width="0.3013%" height="15" fill="rgb(228,23,34)"/><text x="7.6474%" y="159.50"></text></g><g><title>libsystem_malloc.dylib`tiny_size (371 samples, 0.27%)</title><rect x="7.4306%" y="133" width="0.2680%" height="15" fill="rgb(218,30,26)"/><text x="7.6806%" y="143.50"></text></g><g><title>libsystem_malloc.dylib`free (745 samples, 0.54%)</title><rect x="7.1749%" y="165" width="0.5382%" height="15" fill="rgb(220,122,19)"/><text x="7.4249%" y="175.50"></text></g><g><title>libsystem_malloc.dylib`tiny_free_list_add_ptr (541 samples, 0.39%)</title><rect x="8.9066%" y="133" width="0.3909%" height="15" fill="rgb(250,228,42)"/><text x="9.1566%" y="143.50"></text></g><g><title>libsystem_malloc.dylib`free_tiny (2,585 samples, 1.87%)</title><rect x="7.7131%" y="165" width="1.8676%" height="15" fill="rgb(240,193,28)"/><text x="7.9631%" y="175.50">l..</text></g><g><title>libsystem_malloc.dylib`tiny_free_no_lock (1,687 samples, 1.22%)</title><rect x="8.3619%" y="149" width="1.2188%" height="15" fill="rgb(216,20,37)"/><text x="8.6119%" y="159.50"></text></g><g><title>libsystem_malloc.dylib`tiny_free_list_remove_ptr (392 samples, 0.28%)</title><rect x="9.2975%" y="133" width="0.2832%" height="15" fill="rgb(206,188,39)"/><text x="9.5475%" y="143.50"></text></g><g><title>libsystem_malloc.dylib`szone_free_definite_size (146 samples, 0.11%)</title><rect x="9.5807%" y="165" width="0.1055%" height="15" fill="rgb(217,207,13)"/><text x="9.8307%" y="175.50"></text></g><g><title>libsystem_m.dylib`0x00007fff7331e160 (783 samples, 0.57%)</title><rect x="10.6846%" y="149" width="0.5657%" height="15" fill="rgb(231,73,38)"/><text x="10.9346%" y="159.50"></text></g><g><title>libsystem_malloc.dylib`szone_free_definite_size (211 samples, 0.15%)</title><rect x="11.3897%" y="149" width="0.1524%" height="15" fill="rgb(225,20,46)"/><text x="11.6397%" y="159.50"></text></g><g><title>libsystem_malloc.dylib`szone_size (563 samples, 0.41%)</title><rect x="12.2386%" y="117" width="0.4068%" height="15" fill="rgb(210,31,41)"/><text x="12.4886%" y="127.50"></text></g><g><title>libsystem_malloc.dylib`tiny_size (499 samples, 0.36%)</title><rect x="12.2849%" y="101" width="0.3605%" height="15" fill="rgb(221,200,47)"/><text x="12.5349%" y="111.50"></text></g><g><title>libsystem_malloc.dylib`free (849 samples, 0.61%)</title><rect x="12.0479%" y="133" width="0.6134%" height="15" fill="rgb(226,26,5)"/><text x="12.2979%" y="143.50"></text></g><g><title>libsystem_malloc.dylib`tiny_free_list_add_ptr (609 samples, 0.44%)</title><rect x="13.9993%" y="101" width="0.4400%" height="15" fill="rgb(249,33,26)"/><text x="14.2493%" y="111.50"></text></g><g><title>libsystem_malloc.dylib`free_tiny (2,784 samples, 2.01%)</title><rect x="12.6613%" y="133" width="2.0114%" height="15" fill="rgb(235,183,28)"/><text x="12.9113%" y="143.50">l..</text></g><g><title>libsystem_malloc.dylib`tiny_free_no_lock (1,844 samples, 1.33%)</title><rect x="13.3404%" y="117" width="1.3322%" height="15" fill="rgb(221,5,38)"/><text x="13.5904%" y="127.50"></text></g><g><title>libsystem_malloc.dylib`tiny_free_list_remove_ptr (323 samples, 0.23%)</title><rect x="14.4393%" y="101" width="0.2334%" height="15" fill="rgb(247,18,42)"/><text x="14.6893%" y="111.50"></text></g><g><title>libsystem_malloc.dylib`szone_malloc_should_clear (196 samples, 0.14%)</title><rect x="14.9414%" y="85" width="0.1416%" height="15" fill="rgb(241,131,45)"/><text x="15.1914%" y="95.50"></text></g><g><title>libsystem_malloc.dylib`tiny_malloc_should_clear (185 samples, 0.13%)</title><rect x="14.9494%" y="69" width="0.1337%" height="15" fill="rgb(249,31,29)"/><text x="15.1994%" y="79.50"></text></g><g><title>libsystem_malloc.dylib`malloc_zone_malloc (216 samples, 0.16%)</title><rect x="14.9277%" y="101" width="0.1561%" height="15" fill="rgb(225,111,53)"/><text x="15.1777%" y="111.50"></text></g><g><title>libsystem_malloc.dylib`malloc (240 samples, 0.17%)</title><rect x="14.9125%" y="117" width="0.1734%" height="15" fill="rgb(238,160,17)"/><text x="15.1625%" y="127.50"></text></g><g><title>libsystem_malloc.dylib`szone_malloc_should_clear (141 samples, 0.10%)</title><rect x="15.2586%" y="53" width="0.1019%" height="15" fill="rgb(214,148,48)"/><text x="15.5086%" y="63.50"></text></g><g><title>libsystem_malloc.dylib`szone_realloc (467 samples, 0.34%)</title><rect x="15.1437%" y="69" width="0.3374%" height="15" fill="rgb(232,36,49)"/><text x="15.3937%" y="79.50"></text></g><g><title>libsystem_malloc.dylib`malloc_zone_realloc (507 samples, 0.37%)</title><rect x="15.1162%" y="85" width="0.3663%" height="15" fill="rgb(209,103,24)"/><text x="15.3662%" y="95.50"></text></g><g><title>libsystem_malloc.dylib`realloc (574 samples, 0.41%)</title><rect x="15.1040%" y="101" width="0.4147%" height="15" fill="rgb(229,88,8)"/><text x="15.3540%" y="111.50"></text></g><g><title>raytracer`&lt;alloc::vec::Vec&lt;T&gt; as alloc::vec::SpecExtend&lt;T,I&gt;&gt;::from_iter (1,137 samples, 0.82%)</title><rect x="14.7037%" y="133" width="0.8214%" height="15" fill="rgb(213,181,19)"/><text x="14.9537%" y="143.50"></text></g><g><title>raytracer`alloc::raw_vec::RawVec&lt;T,A&gt;::reserve (604 samples, 0.44%)</title><rect x="15.0888%" y="117" width="0.4364%" height="15" fill="rgb(254,191,54)"/><text x="15.3388%" y="127.50"></text></g><g><title>raytracer`raytracer::intersection::Intersection::hit (5,244 samples, 3.79%)</title><rect x="11.7755%" y="149" width="3.7886%" height="15" fill="rgb(241,83,37)"/><text x="12.0255%" y="159.50">rayt..</text></g><g><title>raytracer`raytracer::light::Light::lighting (1,749 samples, 1.26%)</title><rect x="15.5642%" y="149" width="1.2636%" height="15" fill="rgb(233,36,39)"/><text x="15.8142%" y="159.50"></text></g><g><title>libsystem_m.dylib`0x00007fff7331f1c7 (600 samples, 0.43%)</title><rect x="17.9989%" y="133" width="0.4335%" height="15" fill="rgb(226,3,54)"/><text x="18.2489%" y="143.50"></text></g><g><title>libsystem_malloc.dylib`default_zone_free_definite_size (300 samples, 0.22%)</title><rect x="18.4324%" y="133" width="0.2167%" height="15" fill="rgb(245,192,40)"/><text x="18.6824%" y="143.50"></text></g><g><title>libsystem_malloc.dylib`szone_size (1,148 samples, 0.83%)</title><rect x="19.0754%" y="117" width="0.8294%" height="15" fill="rgb(238,167,29)"/><text x="19.3254%" y="127.50"></text></g><g><title>libsystem_malloc.dylib`tiny_size (1,039 samples, 0.75%)</title><rect x="19.1541%" y="101" width="0.7506%" height="15" fill="rgb(232,182,51)"/><text x="19.4041%" y="111.50"></text></g><g><title>libsystem_malloc.dylib`free (1,796 samples, 1.30%)</title><rect x="18.6491%" y="133" width="1.2976%" height="15" fill="rgb(231,60,39)"/><text x="18.8991%" y="143.50"></text></g><g><title>libsystem_malloc.dylib`free_tiny (2,614 samples, 1.89%)</title><rect x="19.9467%" y="133" width="1.8885%" height="15" fill="rgb(208,69,12)"/><text x="20.1967%" y="143.50">l..</text></g><g><title>libsystem_malloc.dylib`tiny_free_no_lock (208 samples, 0.15%)</title><rect x="21.6849%" y="117" width="0.1503%" height="15" fill="rgb(235,93,37)"/><text x="21.9349%" y="127.50"></text></g><g><title>raytracer`DYLD-STUB$$fma (343 samples, 0.25%)</title><rect x="21.9226%" y="133" width="0.2478%" height="15" fill="rgb(213,116,39)"/><text x="22.1726%" y="143.50"></text></g><g><title>libsystem_malloc.dylib`set_tiny_meta_header_in_use (254 samples, 0.18%)</title><rect x="23.9954%" y="53" width="0.1835%" height="15" fill="rgb(222,207,29)"/><text x="24.2454%" y="63.50"></text></g><g><title>libsystem_malloc.dylib`szone_malloc_should_clear (3,056 samples, 2.21%)</title><rect x="22.7470%" y="85" width="2.2079%" height="15" fill="rgb(206,96,30)"/><text x="22.9970%" y="95.50">l..</text></g><g><title>libsystem_malloc.dylib`tiny_malloc_should_clear (2,906 samples, 2.10%)</title><rect x="22.8553%" y="69" width="2.0995%" height="15" fill="rgb(218,138,4)"/><text x="23.1053%" y="79.50">l..</text></g><g><title>libsystem_malloc.dylib`tiny_malloc_from_free_list (1,048 samples, 0.76%)</title><rect x="24.1977%" y="53" width="0.7571%" height="15" fill="rgb(250,191,14)"/><text x="24.4477%" y="63.50"></text></g><g><title>libsystem_malloc.dylib`tiny_free_list_add_ptr (480 samples, 0.35%)</title><rect x="24.6081%" y="37" width="0.3468%" height="15" fill="rgb(239,60,40)"/><text x="24.8581%" y="47.50"></text></g><g><title>libsystem_malloc.dylib`malloc_zone_malloc (3,272 samples, 2.36%)</title><rect x="22.5931%" y="101" width="2.3639%" height="15" fill="rgb(206,27,48)"/><text x="22.8431%" y="111.50">li..</text></g><g><title>libsystem_malloc.dylib`malloc (3,369 samples, 2.43%)</title><rect x="22.5367%" y="117" width="2.4340%" height="15" fill="rgb(225,35,8)"/><text x="22.7867%" y="127.50">li..</text></g><g><title>libsystem_malloc.dylib`set_tiny_meta_header_in_use (153 samples, 0.11%)</title><rect x="25.3500%" y="69" width="0.1105%" height="15" fill="rgb(250,213,24)"/><text x="25.6000%" y="79.50"></text></g><g><title>libsystem_malloc.dylib`szone_malloc_should_clear (275 samples, 0.20%)</title><rect x="25.4606%" y="69" width="0.1987%" height="15" fill="rgb(247,123,22)"/><text x="25.7106%" y="79.50"></text></g><g><title>libsystem_malloc.dylib`tiny_malloc_should_clear (261 samples, 0.19%)</title><rect x="25.4707%" y="53" width="0.1886%" height="15" fill="rgb(231,138,38)"/><text x="25.7207%" y="63.50"></text></g><g><title>libsystem_malloc.dylib`szone_size (228 samples, 0.16%)</title><rect x="25.6593%" y="69" width="0.1647%" height="15" fill="rgb(231,145,46)"/><text x="25.9093%" y="79.50"></text></g><g><title>libsystem_malloc.dylib`tiny_size (192 samples, 0.14%)</title><rect x="25.6853%" y="53" width="0.1387%" height="15" fill="rgb(251,118,11)"/><text x="25.9353%" y="63.50"></text></g><g><title>libsystem_malloc.dylib`tiny_try_realloc_in_place (960 samples, 0.69%)</title><rect x="25.8319%" y="69" width="0.6936%" height="15" fill="rgb(217,147,25)"/><text x="26.0819%" y="79.50"></text></g><g><title>libsystem_malloc.dylib`tiny_free_list_remove_ptr (168 samples, 0.12%)</title><rect x="26.4041%" y="53" width="0.1214%" height="15" fill="rgb(247,81,37)"/><text x="26.6541%" y="63.50"></text></g><g><title>libsystem_malloc.dylib`szone_realloc (1,880 samples, 1.36%)</title><rect x="25.1738%" y="85" width="1.3582%" height="15" fill="rgb(209,12,38)"/><text x="25.4238%" y="95.50"></text></g><g><title>libsystem_malloc.dylib`malloc_zone_realloc (2,059 samples, 1.49%)</title><rect x="25.0582%" y="101" width="1.4876%" height="15" fill="rgb(227,1,9)"/><text x="25.3082%" y="111.50"></text></g><g><title>libsystem_malloc.dylib`szone_size (191 samples, 0.14%)</title><rect x="26.5558%" y="101" width="0.1380%" height="15" fill="rgb(248,47,43)"/><text x="26.8058%" y="111.50"></text></g><g><title>libsystem_malloc.dylib`tiny_size (164 samples, 0.12%)</title><rect x="26.5753%" y="85" width="0.1185%" height="15" fill="rgb(221,10,30)"/><text x="26.8253%" y="95.50"></text></g><g><title>libsystem_malloc.dylib`realloc (2,377 samples, 1.72%)</title><rect x="24.9859%" y="117" width="1.7173%" height="15" fill="rgb(210,229,1)"/><text x="25.2359%" y="127.50"></text></g><g><title>raytracer`alloc::raw_vec::RawVec&lt;T,A&gt;::reserve (6,168 samples, 4.46%)</title><rect x="22.2897%" y="133" width="4.4562%" height="15" fill="rgb(222,148,37)"/><text x="22.5397%" y="143.50">raytr..</text></g><g><title>raytracer`alloc::slice::merge_sort (1,858 samples, 1.34%)</title><rect x="26.8044%" y="133" width="1.3423%" height="15" fill="rgb(234,67,33)"/><text x="27.0544%" y="143.50"></text></g><g><title>raytracer`alloc::slice::insert_head (1,339 samples, 0.97%)</title><rect x="27.1793%" y="117" width="0.9674%" height="15" fill="rgb(247,98,35)"/><text x="27.4293%" y="127.50"></text></g><g><title>raytracer`raytracer::matrix::Matrix::multiply_tuple (186 samples, 0.13%)</title><rect x="28.1467%" y="133" width="0.1344%" height="15" fill="rgb(247,138,52)"/><text x="28.3967%" y="143.50"></text></g><g><title>libsystem_m.dylib`0x00007fff7331f1c7 (3,483 samples, 2.52%)</title><rect x="32.8262%" y="117" width="2.5164%" height="15" fill="rgb(213,79,30)"/><text x="33.0762%" y="127.50">li..</text></g><g><title>libsystem_malloc.dylib`default_zone_malloc (145 samples, 0.10%)</title><rect x="35.7254%" y="85" width="0.1048%" height="15" fill="rgb(246,177,23)"/><text x="35.9754%" y="95.50"></text></g><g><title>libsystem_malloc.dylib`szone_malloc_should_clear (4,346 samples, 3.14%)</title><rect x="35.8302%" y="85" width="3.1399%" height="15" fill="rgb(230,62,27)"/><text x="36.0802%" y="95.50">lib..</text></g><g><title>libsystem_malloc.dylib`tiny_malloc_should_clear (4,057 samples, 2.93%)</title><rect x="36.0390%" y="69" width="2.9311%" height="15" fill="rgb(216,154,8)"/><text x="36.2890%" y="79.50">li..</text></g><g><title>libsystem_malloc.dylib`malloc_zone_malloc (4,804 samples, 3.47%)</title><rect x="35.5029%" y="101" width="3.4707%" height="15" fill="rgb(244,35,45)"/><text x="35.7529%" y="111.50">lib..</text></g><g><title>libsystem_malloc.dylib`malloc (5,096 samples, 3.68%)</title><rect x="35.3425%" y="117" width="3.6817%" height="15" fill="rgb(251,115,12)"/><text x="35.5925%" y="127.50">libs..</text></g><g><title>raytracer`DYLD-STUB$$fma (1,394 samples, 1.01%)</title><rect x="39.0502%" y="117" width="1.0071%" height="15" fill="rgb(240,54,50)"/><text x="39.3002%" y="127.50"></text></g><g><title>raytracer`&lt;core::iter::adapters::Map&lt;I,F&gt; as core::iter::traits::iterator::Iterator&gt;::fold (52,988 samples, 38.28%)</title><rect x="9.7078%" y="165" width="38.2823%" height="15" fill="rgb(233,84,52)"/><text x="9.9578%" y="175.50">raytracer`&lt;core::iter::adapters::Map&lt;I,F&gt; as core::iter::trait..</text></g><g><title>raytracer`raytracer::world::World::intersect_with_ray (43,015 samples, 31.08%)</title><rect x="16.9130%" y="149" width="31.0771%" height="15" fill="rgb(207,117,47)"/><text x="17.1630%" y="159.50">raytracer`raytracer::world::World::intersect_with_..</text></g><g><title>raytracer`raytracer::sphere::Sphere::intersect (27,280 samples, 19.71%)</title><rect x="28.2811%" y="133" width="19.7090%" height="15" fill="rgb(249,43,39)"/><text x="28.5311%" y="143.50">raytracer`raytracer::sphere::Sp..</text></g><g><title>raytracer`raytracer::matrix::Matrix::multiply_tuple (10,980 samples, 7.93%)</title><rect x="40.0574%" y="117" width="7.9327%" height="15" fill="rgb(209,38,44)"/><text x="40.3074%" y="127.50">raytracer`r..</text></g><g><title>libsystem_m.dylib`0x00007fff7331f1c7 (4,017 samples, 2.90%)</title><rect x="45.0879%" y="101" width="2.9022%" height="15" fill="rgb(236,212,23)"/><text x="45.3379%" y="111.50">li..</text></g><g><title>libsystem_m.dylib`0x00007fff7331f1c7 (416 samples, 0.30%)</title><rect x="49.5181%" y="149" width="0.3005%" height="15" fill="rgb(242,79,21)"/><text x="49.7681%" y="159.50"></text></g><g><title>raytracer`DYLD-STUB$$fma (205 samples, 0.15%)</title><rect x="49.8187%" y="149" width="0.1481%" height="15" fill="rgb(211,96,35)"/><text x="50.0687%" y="159.50"></text></g><g><title>raytracer`raytracer::intersection::Intersection::prepare_computations (4,411 samples, 3.19%)</title><rect x="48.1606%" y="165" width="3.1868%" height="15" fill="rgb(253,215,40)"/><text x="48.4106%" y="175.50">ray..</text></g><g><title>raytracer`raytracer::matrix::Matrix::multiply_tuple (1,911 samples, 1.38%)</title><rect x="49.9668%" y="149" width="1.3806%" height="15" fill="rgb(211,81,21)"/><text x="50.2168%" y="159.50"></text></g><g><title>libsystem_m.dylib`0x00007fff7331f1c7 (707 samples, 0.51%)</title><rect x="50.8366%" y="133" width="0.5108%" height="15" fill="rgb(208,190,38)"/><text x="51.0866%" y="143.50"></text></g><g><title>libsystem_m.dylib`0x00007fff7331f1c7 (596 samples, 0.43%)</title><rect x="52.4550%" y="149" width="0.4306%" height="15" fill="rgb(235,213,38)"/><text x="52.7050%" y="159.50"></text></g><g><title>libsystem_malloc.dylib`default_zone_free_definite_size (235 samples, 0.17%)</title><rect x="52.8855%" y="149" width="0.1698%" height="15" fill="rgb(237,122,38)"/><text x="53.1355%" y="159.50"></text></g><g><title>libsystem_malloc.dylib`szone_size (1,043 samples, 0.75%)</title><rect x="53.4382%" y="133" width="0.7535%" height="15" fill="rgb(244,218,35)"/><text x="53.6882%" y="143.50"></text></g><g><title>libsystem_malloc.dylib`tiny_size (928 samples, 0.67%)</title><rect x="53.5213%" y="117" width="0.6705%" height="15" fill="rgb(240,68,47)"/><text x="53.7713%" y="127.50"></text></g><g><title>libsystem_malloc.dylib`free (1,638 samples, 1.18%)</title><rect x="53.0553%" y="149" width="1.1834%" height="15" fill="rgb(210,16,53)"/><text x="53.3053%" y="159.50"></text></g><g><title>libsystem_malloc.dylib`tiny_free_list_add_ptr (382 samples, 0.28%)</title><rect x="56.3072%" y="117" width="0.2760%" height="15" fill="rgb(235,124,12)"/><text x="56.5572%" y="127.50"></text></g><g><title>libsystem_malloc.dylib`free_tiny (3,460 samples, 2.50%)</title><rect x="54.2387%" y="149" width="2.4997%" height="15" fill="rgb(224,169,11)"/><text x="54.4887%" y="159.50">li..</text></g><g><title>libsystem_malloc.dylib`tiny_free_no_lock (1,186 samples, 0.86%)</title><rect x="55.8816%" y="133" width="0.8568%" height="15" fill="rgb(250,166,2)"/><text x="56.1316%" y="143.50"></text></g><g><title>libsystem_malloc.dylib`tiny_free_list_remove_ptr (215 samples, 0.16%)</title><rect x="56.5831%" y="117" width="0.1553%" height="15" fill="rgb(242,216,29)"/><text x="56.8331%" y="127.50"></text></g><g><title>raytracer`DYLD-STUB$$fma (377 samples, 0.27%)</title><rect x="56.8114%" y="149" width="0.2724%" height="15" fill="rgb(230,116,27)"/><text x="57.0614%" y="159.50"></text></g><g><title>libsystem_malloc.dylib`szone_malloc_should_clear (2,256 samples, 1.63%)</title><rect x="57.6076%" y="101" width="1.6299%" height="15" fill="rgb(228,99,48)"/><text x="57.8576%" y="111.50"></text></g><g><title>libsystem_malloc.dylib`tiny_malloc_should_clear (2,119 samples, 1.53%)</title><rect x="57.7066%" y="85" width="1.5309%" height="15" fill="rgb(253,11,6)"/><text x="57.9566%" y="95.50"></text></g><g><title>libsystem_malloc.dylib`tiny_malloc_from_free_list (484 samples, 0.35%)</title><rect x="58.8878%" y="69" width="0.3497%" height="15" fill="rgb(247,143,39)"/><text x="59.1378%" y="79.50"></text></g><g><title>libsystem_malloc.dylib`tiny_free_list_add_ptr (228 samples, 0.16%)</title><rect x="59.0728%" y="53" width="0.1647%" height="15" fill="rgb(236,97,10)"/><text x="59.3228%" y="63.50"></text></g><g><title>libsystem_malloc.dylib`malloc_zone_malloc (2,463 samples, 1.78%)</title><rect x="57.4660%" y="117" width="1.7794%" height="15" fill="rgb(233,208,19)"/><text x="57.7160%" y="127.50">l..</text></g><g><title>libsystem_malloc.dylib`malloc (2,577 samples, 1.86%)</title><rect x="57.4060%" y="133" width="1.8618%" height="15" fill="rgb(216,164,2)"/><text x="57.6560%" y="143.50">l..</text></g><g><title>libsystem_malloc.dylib`szone_malloc_should_clear (353 samples, 0.26%)</title><rect x="59.6977%" y="85" width="0.2550%" height="15" fill="rgb(220,129,5)"/><text x="59.9477%" y="95.50"></text></g><g><title>libsystem_malloc.dylib`tiny_malloc_should_clear (329 samples, 0.24%)</title><rect x="59.7151%" y="69" width="0.2377%" height="15" fill="rgb(242,17,10)"/><text x="59.9651%" y="79.50"></text></g><g><title>libsystem_malloc.dylib`szone_size (193 samples, 0.14%)</title><rect x="59.9528%" y="85" width="0.1394%" height="15" fill="rgb(242,107,0)"/><text x="60.2028%" y="95.50"></text></g><g><title>libsystem_malloc.dylib`tiny_size (171 samples, 0.12%)</title><rect x="59.9686%" y="69" width="0.1235%" height="15" fill="rgb(251,28,31)"/><text x="60.2186%" y="79.50"></text></g><g><title>libsystem_malloc.dylib`tiny_free_list_add_ptr (157 samples, 0.11%)</title><rect x="60.4794%" y="69" width="0.1134%" height="15" fill="rgb(233,223,10)"/><text x="60.7294%" y="79.50"></text></g><g><title>libsystem_malloc.dylib`tiny_try_realloc_in_place (800 samples, 0.58%)</title><rect x="60.1001%" y="85" width="0.5780%" height="15" fill="rgb(215,21,27)"/><text x="60.3501%" y="95.50"></text></g><g><title>libsystem_malloc.dylib`szone_realloc (1,712 samples, 1.24%)</title><rect x="59.4485%" y="101" width="1.2369%" height="15" fill="rgb(232,23,21)"/><text x="59.6985%" y="111.50"></text></g><g><title>libsystem_malloc.dylib`malloc_zone_realloc (1,857 samples, 1.34%)</title><rect x="59.3596%" y="117" width="1.3416%" height="15" fill="rgb(244,5,23)"/><text x="59.6096%" y="127.50"></text></g><g><title>libsystem_malloc.dylib`szone_size (180 samples, 0.13%)</title><rect x="60.7063%" y="117" width="0.1300%" height="15" fill="rgb(226,81,46)"/><text x="60.9563%" y="127.50"></text></g><g><title>libsystem_malloc.dylib`tiny_size (162 samples, 0.12%)</title><rect x="60.7193%" y="101" width="0.1170%" height="15" fill="rgb(247,70,30)"/><text x="60.9693%" y="111.50"></text></g><g><title>libsystem_malloc.dylib`realloc (2,150 samples, 1.55%)</title><rect x="59.2874%" y="133" width="1.5533%" height="15" fill="rgb(212,68,19)"/><text x="59.5374%" y="143.50"></text></g><g><title>raytracer`alloc::raw_vec::RawVec&lt;T,A&gt;::reserve (5,086 samples, 3.67%)</title><rect x="57.2016%" y="149" width="3.6745%" height="15" fill="rgb(240,187,13)"/><text x="57.4516%" y="159.50">rayt..</text></g><g><title>raytracer`alloc::slice::merge_sort (1,811 samples, 1.31%)</title><rect x="60.9324%" y="149" width="1.3084%" height="15" fill="rgb(223,113,26)"/><text x="61.1824%" y="159.50"></text></g><g><title>raytracer`alloc::slice::insert_head (1,342 samples, 0.97%)</title><rect x="61.2713%" y="133" width="0.9696%" height="15" fill="rgb(206,192,2)"/><text x="61.5213%" y="143.50"></text></g><g><title>raytracer`raytracer::matrix::Matrix::multiply_tuple (178 samples, 0.13%)</title><rect x="62.2408%" y="149" width="0.1286%" height="15" fill="rgb(241,108,4)"/><text x="62.4908%" y="159.50"></text></g><g><title>libsystem_m.dylib`0x00007fff7331f1c7 (3,530 samples, 2.55%)</title><rect x="66.8422%" y="133" width="2.5503%" height="15" fill="rgb(247,173,49)"/><text x="67.0922%" y="143.50">li..</text></g><g><title>libsystem_malloc.dylib`default_zone_malloc (143 samples, 0.10%)</title><rect x="69.7422%" y="101" width="0.1033%" height="15" fill="rgb(224,114,35)"/><text x="69.9922%" y="111.50"></text></g><g><title>libsystem_malloc.dylib`set_tiny_meta_header_in_use (311 samples, 0.22%)</title><rect x="72.9204%" y="69" width="0.2247%" height="15" fill="rgb(245,159,27)"/><text x="73.1704%" y="79.50"></text></g><g><title>libsystem_malloc.dylib`szone_malloc_should_clear (5,925 samples, 4.28%)</title><rect x="69.8455%" y="101" width="4.2806%" height="15" fill="rgb(245,172,44)"/><text x="70.0955%" y="111.50">libsy..</text></g><g><title>libsystem_malloc.dylib`tiny_malloc_should_clear (5,608 samples, 4.05%)</title><rect x="70.0746%" y="85" width="4.0516%" height="15" fill="rgb(236,23,11)"/><text x="70.3246%" y="95.50">libs..</text></g><g><title>libsystem_malloc.dylib`tiny_malloc_from_free_list (1,326 samples, 0.96%)</title><rect x="73.1682%" y="69" width="0.9580%" height="15" fill="rgb(205,117,38)"/><text x="73.4182%" y="79.50"></text></g><g><title>libsystem_malloc.dylib`tiny_free_list_add_ptr (470 samples, 0.34%)</title><rect x="73.7866%" y="53" width="0.3396%" height="15" fill="rgb(237,72,25)"/><text x="74.0366%" y="63.50"></text></g><g><title>libsystem_malloc.dylib`malloc_zone_malloc (6,353 samples, 4.59%)</title><rect x="69.5370%" y="117" width="4.5899%" height="15" fill="rgb(244,70,9)"/><text x="69.7870%" y="127.50">libsy..</text></g><g><title>libsystem_malloc.dylib`malloc (6,629 samples, 4.79%)</title><rect x="69.3925%" y="133" width="4.7893%" height="15" fill="rgb(217,125,39)"/><text x="69.6425%" y="143.50">libsys..</text></g><g><title>raytracer`DYLD-STUB$$fma (1,340 samples, 0.97%)</title><rect x="74.2049%" y="133" width="0.9681%" height="15" fill="rgb(235,36,10)"/><text x="74.4549%" y="143.50"></text></g><g><title>raytracer`raytracer::world::World::color_at (105,490 samples, 76.21%)</title><rect x="6.8136%" y="181" width="76.2134%" height="15" fill="rgb(251,123,47)"/><text x="7.0636%" y="191.50">raytracer`raytracer::world::World::color_at</text></g><g><title>raytracer`raytracer::world::World::intersect_with_ray (43,692 samples, 31.57%)</title><rect x="51.4608%" y="165" width="31.5662%" height="15" fill="rgb(221,13,13)"/><text x="51.7108%" y="175.50">raytracer`raytracer::world::World::intersect_with_r..</text></g><g><title>raytracer`raytracer::sphere::Sphere::intersect (28,593 samples, 20.66%)</title><rect x="62.3694%" y="149" width="20.6576%" height="15" fill="rgb(238,131,9)"/><text x="62.6194%" y="159.50">raytracer`raytracer::sphere::Sphe..</text></g><g><title>raytracer`raytracer::matrix::Matrix::multiply_tuple (10,871 samples, 7.85%)</title><rect x="75.1730%" y="133" width="7.8540%" height="15" fill="rgb(211,50,8)"/><text x="75.4230%" y="143.50">raytracer`r..</text></g><g><title>libsystem_m.dylib`0x00007fff7331f1c7 (4,072 samples, 2.94%)</title><rect x="80.0851%" y="117" width="2.9419%" height="15" fill="rgb(245,182,24)"/><text x="80.3351%" y="127.50">li..</text></g><g><title>raytracer`raytracer::camera::Camera::render (110,955 samples, 80.16%)</title><rect x="2.8754%" y="197" width="80.1617%" height="15" fill="rgb(242,14,37)"/><text x="3.1254%" y="207.50">raytracer`raytracer::camera::Camera::render</text></g><g><title>libsystem_kernel.dylib`write (364 samples, 0.26%)</title><rect x="86.3157%" y="181" width="0.2630%" height="15" fill="rgb(246,228,12)"/><text x="86.5657%" y="191.50"></text></g><g><title>libsystem_malloc.dylib`default_zone_free_definite_size (176 samples, 0.13%)</title><rect x="86.5787%" y="181" width="0.1272%" height="15" fill="rgb(213,55,15)"/><text x="86.8287%" y="191.50"></text></g><g><title>libsystem_malloc.dylib`szone_size (458 samples, 0.33%)</title><rect x="86.9240%" y="165" width="0.3309%" height="15" fill="rgb(209,9,3)"/><text x="87.1740%" y="175.50"></text></g><g><title>libsystem_malloc.dylib`tiny_size (418 samples, 0.30%)</title><rect x="86.9529%" y="149" width="0.3020%" height="15" fill="rgb(230,59,30)"/><text x="87.2029%" y="159.50"></text></g><g><title>libsystem_malloc.dylib`free (785 samples, 0.57%)</title><rect x="86.7058%" y="181" width="0.5671%" height="15" fill="rgb(209,121,21)"/><text x="86.9558%" y="191.50"></text></g><g><title>libsystem_malloc.dylib`free_large (142 samples, 0.10%)</title><rect x="87.2730%" y="181" width="0.1026%" height="15" fill="rgb(220,109,13)"/><text x="87.5230%" y="191.50"></text></g><g><title>libsystem_malloc.dylib`mvm_deallocate_pages (142 samples, 0.10%)</title><rect x="87.2730%" y="165" width="0.1026%" height="15" fill="rgb(232,18,1)"/><text x="87.5230%" y="175.50"></text></g><g><title>libsystem_kernel.dylib`_kernelrpc_mach_vm_deallocate_trap (142 samples, 0.10%)</title><rect x="87.2730%" y="149" width="0.1026%" height="15" fill="rgb(215,41,42)"/><text x="87.5230%" y="159.50"></text></g><g><title>libsystem_malloc.dylib`free_tiny (897 samples, 0.65%)</title><rect x="87.3756%" y="181" width="0.6481%" height="15" fill="rgb(224,123,36)"/><text x="87.6256%" y="191.50"></text></g><g><title>libsystem_platform.dylib`_platform_memmove$VARIANT$Haswell (363 samples, 0.26%)</title><rect x="88.0482%" y="181" width="0.2623%" height="15" fill="rgb(240,125,3)"/><text x="88.2982%" y="191.50"></text></g><g><title>raytracer`&lt;&amp;mut W as core::fmt::Write&gt;::write_str (970 samples, 0.70%)</title><rect x="88.9838%" y="149" width="0.7008%" height="15" fill="rgb(205,98,50)"/><text x="89.2338%" y="159.50"></text></g><g><title>libsystem_platform.dylib`_platform_memmove$VARIANT$Haswell (528 samples, 0.38%)</title><rect x="89.3031%" y="133" width="0.3815%" height="15" fill="rgb(205,185,37)"/><text x="89.5531%" y="143.50"></text></g><g><title>raytracer`core::fmt::float::_&lt;impl core::fmt::Display for f64&gt;::fmt (149 samples, 0.11%)</title><rect x="89.7915%" y="149" width="0.1076%" height="15" fill="rgb(238,207,15)"/><text x="90.0415%" y="159.50"></text></g><g><title>raytracer`core::fmt::Formatter::pad_formatted_parts (229 samples, 0.17%)</title><rect x="90.9554%" y="133" width="0.1654%" height="15" fill="rgb(213,199,42)"/><text x="91.2054%" y="143.50"></text></g><g><title>libsystem_malloc.dylib`szone_malloc_should_clear (1,744 samples, 1.26%)</title><rect x="92.2985%" y="69" width="1.2600%" height="15" fill="rgb(235,201,11)"/><text x="92.5485%" y="79.50"></text></g><g><title>libsystem_malloc.dylib`tiny_malloc_should_clear (1,611 samples, 1.16%)</title><rect x="92.3946%" y="53" width="1.1639%" height="15" fill="rgb(207,46,11)"/><text x="92.6446%" y="63.50"></text></g><g><title>libsystem_malloc.dylib`malloc_zone_malloc (1,937 samples, 1.40%)</title><rect x="92.1612%" y="85" width="1.3994%" height="15" fill="rgb(241,35,35)"/><text x="92.4112%" y="95.50"></text></g><g><title>libsystem_malloc.dylib`malloc (2,048 samples, 1.48%)</title><rect x="92.1020%" y="101" width="1.4796%" height="15" fill="rgb(243,32,47)"/><text x="92.3520%" y="111.50"></text></g><g><title>libsystem_malloc.dylib`szone_size (306 samples, 0.22%)</title><rect x="93.9833%" y="53" width="0.2211%" height="15" fill="rgb(247,202,23)"/><text x="94.2333%" y="63.50"></text></g><g><title>libsystem_malloc.dylib`tiny_size (271 samples, 0.20%)</title><rect x="94.0086%" y="37" width="0.1958%" height="15" fill="rgb(219,102,11)"/><text x="94.2586%" y="47.50"></text></g><g><title>libsystem_malloc.dylib`szone_realloc (495 samples, 0.36%)</title><rect x="93.8648%" y="69" width="0.3576%" height="15" fill="rgb(243,110,44)"/><text x="94.1148%" y="79.50"></text></g><g><title>libsystem_malloc.dylib`malloc_zone_realloc (718 samples, 0.52%)</title><rect x="93.7073%" y="85" width="0.5187%" height="15" fill="rgb(222,74,54)"/><text x="93.9573%" y="95.50"></text></g><g><title>libsystem_malloc.dylib`szone_size (275 samples, 0.20%)</title><rect x="94.2267%" y="85" width="0.1987%" height="15" fill="rgb(216,99,12)"/><text x="94.4767%" y="95.50"></text></g><g><title>libsystem_malloc.dylib`tiny_size (256 samples, 0.18%)</title><rect x="94.2405%" y="69" width="0.1850%" height="15" fill="rgb(226,22,26)"/><text x="94.4905%" y="79.50"></text></g><g><title>libsystem_malloc.dylib`realloc (1,164 samples, 0.84%)</title><rect x="93.5967%" y="101" width="0.8410%" height="15" fill="rgb(217,163,10)"/><text x="93.8467%" y="111.50"></text></g><g><title>libsystem_platform.dylib`_platform_memmove$VARIANT$Haswell (307 samples, 0.22%)</title><rect x="94.4485%" y="101" width="0.2218%" height="15" fill="rgb(213,25,53)"/><text x="94.6985%" y="111.50"></text></g><g><title>raytracer`&lt;&amp;mut W as core::fmt::Write&gt;::write_str (4,154 samples, 3.00%)</title><rect x="91.6974%" y="117" width="3.0011%" height="15" fill="rgb(252,105,26)"/><text x="91.9474%" y="127.50">ray..</text></g><g><title>raytracer`core::fmt::Formatter::write_formatted_parts (5,060 samples, 3.66%)</title><rect x="91.1208%" y="133" width="3.6557%" height="15" fill="rgb(220,39,43)"/><text x="91.3708%" y="143.50">rayt..</text></g><g><title>raytracer`core::fmt::float::float_to_decimal_common_shortest (13,526 samples, 9.77%)</title><rect x="89.8991%" y="149" width="9.7721%" height="15" fill="rgb(229,68,48)"/><text x="90.1491%" y="159.50">raytracer`core..</text></g><g><title>raytracer`core::num::flt2dec::strategy::grisu::format_shortest_opt (6,775 samples, 4.89%)</title><rect x="94.7765%" y="133" width="4.8947%" height="15" fill="rgb(252,8,32)"/><text x="95.0265%" y="143.50">raytra..</text></g><g><title>raytracer`alloc::fmt::format (15,815 samples, 11.43%)</title><rect x="88.3104%" y="181" width="11.4259%" height="15" fill="rgb(223,20,43)"/><text x="88.5604%" y="191.50">raytracer`alloc::..</text></g><g><title>raytracer`core::fmt::write (15,420 samples, 11.14%)</title><rect x="88.5958%" y="165" width="11.1405%" height="15" fill="rgb(229,81,49)"/><text x="88.8458%" y="175.50">raytracer`core::..</text></g><g><title>raytracer`alloc::raw_vec::RawVec&lt;T,A&gt;::reserve (153 samples, 0.11%)</title><rect x="99.7363%" y="181" width="0.1105%" height="15" fill="rgb(236,28,36)"/><text x="99.9863%" y="191.50"></text></g><g><title>raytracer`raytracer::canvas::Canvas::save_file (23,423 samples, 16.92%)</title><rect x="83.0371%" y="197" width="16.9224%" height="15" fill="rgb(249,185,26)"/><text x="83.2871%" y="207.50">raytracer`raytracer::canva..</text></g><g><title>all (138,414 samples, 100%)</title><rect x="0.0000%" y="325" width="100.0000%" height="15" fill="rgb(249,174,33)"/><text x="0.2500%" y="335.50"></text></g><g><title>raytracer`0x1 (138,414 samples, 100.00%)</title><rect x="0.0000%" y="309" width="100.0000%" height="15" fill="rgb(233,201,37)"/><text x="0.2500%" y="319.50">raytracer`0x1</text></g><g><title>libdyld.dylib`start (138,414 samples, 100.00%)</title><rect x="0.0000%" y="293" width="100.0000%" height="15" fill="rgb(221,78,26)"/><text x="0.2500%" y="303.50">libdyld.dylib`start</text></g><g><title>raytracer`main (138,413 samples, 100.00%)</title><rect x="0.0007%" y="277" width="99.9993%" height="15" fill="rgb(250,127,30)"/><text x="0.2507%" y="287.50">raytracer`main</text></g><g><title>raytracer`std::rt::lang_start_internal (138,413 samples, 100.00%)</title><rect x="0.0007%" y="261" width="99.9993%" height="15" fill="rgb(230,49,44)"/><text x="0.2507%" y="271.50">raytracer`std::rt::lang_start_internal</text></g><g><title>raytracer`std::rt::lang_start::_{{closure}} (138,413 samples, 100.00%)</title><rect x="0.0007%" y="245" width="99.9993%" height="15" fill="rgb(229,67,23)"/><text x="0.2507%" y="255.50">raytracer`std::rt::lang_start::_{{closure}}</text></g><g><title>raytracer`raytracer::main (138,413 samples, 100.00%)</title><rect x="0.0007%" y="229" width="99.9993%" height="15" fill="rgb(249,83,47)"/><text x="0.2507%" y="239.50">raytracer`raytracer::main</text></g><g><title>raytracer`raytracer::demo::demo (138,413 samples, 100.00%)</title><rect x="0.0007%" y="213" width="99.9993%" height="15" fill="rgb(215,43,3)"/><text x="0.2507%" y="223.50">raytracer`raytracer::demo::demo</text></g></svg></svg>

@@ -1,0 +1,16 @@
+[package]
+name = "ray-tracer"
+version = "0.1.0"
+authors = ["Arnaud Gourlay <arnaud.gourlay@commercetools.de>"]
+edition = "2018"
+
+[dependencies]
+
+
+[dev-dependencies]
+quickcheck = "0.9.2"
+quickcheck_macros = "0.9.1"
+rand = "0.7.3"
+
+[profile.release]
+debug = true #necessary for https://github.com/flamegraph-rs/flamegraph
