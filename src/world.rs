@@ -4,13 +4,13 @@ use crate::light::Light;
 use crate::material::Material;
 use crate::matrix::Matrix;
 use crate::ray::Ray;
+use crate::shape::Shape;
 use crate::sphere::Sphere;
-use crate::sphere::*;
 use crate::tuple::*;
 
 pub struct World {
     pub lights: Vec<Light>,
-    pub objects: Vec<Sphere>,
+    pub objects: Vec<Box<dyn Shape>>,
 }
 
 impl World {
@@ -21,9 +21,9 @@ impl World {
         }
     }
 
-    pub fn add_object(self, object: Sphere) -> World {
-        let mut objects: Vec<Sphere> = Vec::new();
-        Vec::extend_from_slice(&mut objects, &self.objects);
+    pub fn add_object(self, object: Box<dyn Shape>) -> World {
+        let mut objects: Vec<Box<dyn Shape>> = Vec::new();
+        self.objects.into_iter().for_each(|o| objects.push(o));
         objects.push(object);
         World { objects, ..self }
     }
@@ -46,14 +46,16 @@ impl World {
                 Color::make(1.0, 1.0, 1.0),
             )],
             objects: vec![
-                Sphere::new(1).set_radius(1.0).set_material(Material::new(
+                Box::new(Sphere::new(1).set_radius(1.0).set_material(Material::new(
                     Color::make(0.8, 1.0, 0.6),
                     0.7,
                     0.2,
-                )),
-                Sphere::new(2)
-                    .set_radius(0.5)
-                    .set_transform(Matrix::scaling(0.5, 0.5, 0.5)),
+                ))),
+                Box::new(
+                    Sphere::new(2)
+                        .set_radius(0.5)
+                        .set_transform(Matrix::scaling(0.5, 0.5, 0.5)),
+                ),
             ],
         }
     }
@@ -63,6 +65,7 @@ impl World {
         self.objects.iter().for_each(|o| {
             o.intersect(&ray)
                 .iter()
+                .filter(|i| i.distance > 0.0)
                 .for_each(|i| intersections.push(*i))
         });
         intersections.sort_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap());
@@ -76,14 +79,14 @@ impl World {
             let shape = self
                 .objects
                 .iter()
-                .find(|&o| o.id == comps.object_id)
+                .find(|&o| o.id() == comps.object_id)
                 .unwrap();
             // adding color for each light
             self.lights
                 .iter()
                 .map(|l| {
                     l.lighting(
-                        &shape.material,
+                        &shape.material(),
                         &comps.over_point,
                         &comps.eyev,
                         &comps.normalv,
@@ -118,10 +121,7 @@ impl World {
 
         // the point is in the shadow if the hit lies between the point and the light source
         let hit = Intersection::hit(intersections);
-        match hit {
-            Some((_, d)) if d < distance => true,
-            _ => false,
-        }
+        matches!(hit, Some((_, d)) if d < distance)
     }
 }
 
@@ -134,8 +134,8 @@ mod world_tests {
     use crate::material::Material;
     use crate::matrix::Matrix;
     use crate::ray::Ray;
+    use crate::shape::Shape;
     use crate::sphere::Sphere;
-    use crate::sphere::*;
     use crate::tuple::*;
 
     #[test]
@@ -159,8 +159,8 @@ mod world_tests {
         let s2 = Sphere::new(2)
             .set_radius(0.5)
             .set_transform(Matrix::scaling(0.5, 0.5, 0.5));
-        assert_eq!(world.objects[0], s1);
-        assert_eq!(world.objects[1], s2);
+        assert_eq!(world.objects[0].id(), s1.id());
+        assert_eq!(world.objects[1].id(), s2.id());
     }
 
     #[test]
@@ -179,16 +179,12 @@ mod world_tests {
     fn shade_at_intersection() {
         let w = World::default();
         let r = Ray::new(point(0.0, 0.0, -5.0), vector(0.0, 0.0, 1.0));
-        let intersection = Intersection::new(w.objects[0].id, 4.0);
+        let intersection = Intersection::new(w.objects[0].id(), 4.0);
         let comps = Intersection::prepare_computations(&intersection, &r, &w);
         let color = w.shade_hit(&comps);
         assert_eq!(
             color,
-            Color::make(
-                0.38066116930395194,
-                0.4758264616299399,
-                0.2854958769779639
-            )
+            Color::make(0.38066116930395194, 0.4758264616299399, 0.2854958769779639)
         );
     }
 
@@ -197,7 +193,7 @@ mod world_tests {
         let light = Light::point_light(point(0.0, 0.25, 0.0), Color::make(1.0, 1.0, 1.0));
         let w = World::default().set_light(light);
         let r = Ray::new(point(0.0, 0.0, 0.0), vector(0.0, 0.0, 1.0));
-        let intersection = Intersection::new(w.objects[1].id, 0.5);
+        let intersection = Intersection::new(w.objects[1].id(), 0.5);
         let comps = Intersection::prepare_computations(&intersection, &r, &w);
         let color = w.shade_hit(&comps);
         assert_eq!(
@@ -222,11 +218,7 @@ mod world_tests {
         let color = w.color_at(&r);
         assert_eq!(
             color,
-            Color::make(
-                0.38066116930395194,
-                0.4758264616299399,
-                0.2854958769779639
-            )
+            Color::make(0.38066116930395194, 0.4758264616299399, 0.2854958769779639)
         );
     }
 
@@ -269,16 +261,13 @@ mod world_tests {
         let s2 = Sphere::new(2).set_transform(Matrix::translation(0.0, 0.0, 10.0));
         let w = World::empty()
             .set_light(light)
-            .add_object(s1)
-            .add_object(s2);
+            .add_object(Box::new(s1))
+            .add_object(Box::new(s2));
 
         let r = Ray::new(point(0.0, 0.0, 5.0), vector(0.0, 0.0, 1.0));
-        let intersection = Intersection::new(w.objects[1].id, 4.0);
+        let intersection = Intersection::new(w.objects[1].id(), 4.0);
         let comps = Intersection::prepare_computations(&intersection, &r, &w);
         let color = w.shade_hit(&comps);
-        assert_eq!(
-            color,
-            Color::make(0.1, 0.1, 0.1)
-        );
+        assert_eq!(color, Color::make(0.1, 0.1, 0.1));
     }
 }

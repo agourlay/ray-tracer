@@ -1,7 +1,10 @@
+use crate::epsilon::EPSILON;
 use crate::intersection::*;
 use crate::material::Material;
 use crate::matrix::Matrix;
+use crate::matrix::Transformation;
 use crate::ray::*;
+use crate::shape::Shape;
 use crate::tuple::*;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -13,43 +16,20 @@ pub struct Sphere {
     pub material: Material,
 }
 
-// structure to cache redundant operations on the transform field
-#[derive(Debug, PartialEq, Clone)]
-struct Transformation {
-    matrix: Matrix,
-    inverse: Matrix,
-    inverse_transpose: Matrix,
-}
-
 impl Sphere {
     pub fn new(id: usize) -> Sphere {
         Sphere {
             id,
-            center: point(0.0, 0.0, 0.0),
+            center: point_zero(),
             radius: 1.0,
-            transform: Transformation {
-                matrix: Matrix::identity(),
-                inverse: Matrix::identity(),
-                inverse_transpose: Matrix::identity(),
-            },
+            transform: Transformation::default(),
             material: Material::default(),
         }
     }
 
-    pub fn set_radius(self, radius: f64) -> Sphere {
-        Sphere { radius, ..self }
-    }
-
     pub fn set_transform(self, transform: Matrix) -> Sphere {
-        let inverse = Matrix::inverse(&transform);
-        let inverse_transpose = inverse.transpose();
-        let transformation = Transformation {
-            matrix: transform,
-            inverse,
-            inverse_transpose,
-        };
         Sphere {
-            transform: transformation,
+            transform: Transformation::make(transform),
             ..self
         }
     }
@@ -58,15 +38,32 @@ impl Sphere {
         Sphere { material, ..self }
     }
 
+    pub fn set_radius(self, radius: f64) -> Sphere {
+        Sphere { radius, ..self }
+    }
+}
+
+impl Shape for Sphere {
+    fn id(&self) -> usize {
+        self.id
+    }
+
+    fn transform(&self) -> Transformation {
+        self.transform.clone()
+    }
+
+    fn material(&self) -> Material {
+        self.material
+    }
+
     // https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-sphere-intersection
-    pub fn intersect(&self, ray: &Ray) -> Vec<Intersection> {
-        let ray2 = ray.transform(&self.transform.inverse);
+    fn local_intersect(&self, local_ray: &Ray) -> Vec<Intersection> {
         // ray from the sphere center to the ray origin
-        let sphere_to_ray = subtract_tuple(&ray2.origin, &self.center);
-        let a = vector_dot_product(&ray2.direction, &ray2.direction);
-        let b = 2.0 * vector_dot_product(&ray2.direction, &sphere_to_ray);
+        let sphere_to_ray = subtract_tuple(&local_ray.origin, &self.center);
+        let a = vector_dot_product(&local_ray.direction, &local_ray.direction);
+        let b = 2.0 * vector_dot_product(&local_ray.direction, &sphere_to_ray);
         let c = vector_dot_product(&sphere_to_ray, &sphere_to_ray) - self.radius;
-        let discriminant = b.powf(2.0) - 4.0 * a * c;
+        let discriminant = b.powi(2) - 4.0 * a * c;
         if discriminant < 0.0 {
             vec![]
         } else {
@@ -74,7 +71,7 @@ impl Sphere {
             let two_a = 2.0 * a;
             let t1 = (-b - sqrt_discriminant) / two_a;
             let t2 = (-b + sqrt_discriminant) / two_a;
-            if (t1 - t2).abs() < f64::EPSILON {
+            if (t1 - t2).abs() < EPSILON {
                 vec![Intersection::new(self.id, t1)]
             } else if t1 < t2 {
                 vec![
@@ -90,26 +87,18 @@ impl Sphere {
         }
     }
 
-    pub fn normal_at(&self, p: &Tuple) -> Tuple {
-        let object_point = &self.transform.inverse.multiply_tuple(&p);
-        let object_normal = subtract_tuple(&object_point, &point(0.0, 0.0, 0.0));
-        let world_normal = &self
-            .transform
-            .inverse_transpose
-            .multiply_tuple(&object_normal);
-        let tmp = vector(world_normal.0, world_normal.1, world_normal.2);
-        vector_normalize(&tmp)
+    fn local_normal_at(&self, local_point: &(f64, f64, f64, f64)) -> (f64, f64, f64, f64) {
+        subtract_tuple(local_point, &point_zero())
     }
 }
 
 #[cfg(test)]
 mod sphere_tests {
-    use crate::intersection::*;
     use crate::material::Material;
     use crate::matrix::Matrix;
     use crate::ray::*;
+    use crate::shape::Shape;
     use crate::sphere::*;
-    use crate::tuple::*;
     use std::f64::consts::PI;
 
     #[test]

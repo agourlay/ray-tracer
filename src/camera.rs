@@ -88,7 +88,7 @@ mod camera_tests {
     use crate::tuple::*;
     use crate::world::World;
     use std::f32::consts::FRAC_PI_2;
-    use std::f64::consts::{FRAC_2_PI, FRAC_PI_4};
+    use std::f64::consts::FRAC_PI_4;
 
     #[test]
     fn constructing_a_camera() {
@@ -150,7 +150,7 @@ mod camera_tests {
     fn rendering_world_with_camera() {
         let w = World::default();
         let from = point(0.0, 0.0, -5.0);
-        let to = point_zero();
+        let to = point(0.0, 0.0, 0.0);
         let up = vector(0.0, 1.0, 0.0);
         let c =
             Camera::new(11, 11, FRAC_PI_2 as f64).set_transform(view_transform(&from, &to, &up));
@@ -158,11 +158,7 @@ mod camera_tests {
         let color_at = canvas.color_at(5, 5);
         assert_eq!(
             color_at.unwrap(),
-            Color::make(
-                0.380661169303951945,
-                0.4758264616299399,
-                0.2854958769779639
-            )
+            Color::make(0.380661169303951945, 0.4758264616299399, 0.2854958769779639)
         );
     }
 }

@@ -12,7 +12,11 @@
 - use SIMD for math heavy part
   - matrix multiplication
   - vector dot product
-  - https://www.youtube.com/watch?v=4Gs_CA_vm3o  
+  - https://www.youtube.com/watch?v=4Gs_CA_vm3o
+- compare implementations
+  - https://github.com/magnusstrale/raytracer
+  - https://github.com/Dalamar42/rayt
+  - https://github.com/sungiant/sdf
   
 ## More resources
 
@@ -28,4 +32,3 @@
   - https://raytracing.github.io/books/RayTracingInOneWeekend.html
   - https://raytracing.github.io/books/RayTracingTheNextWeek.html
   - https://raytracing.github.io/books/RayTracingTheRestOfYourLife.html
-     

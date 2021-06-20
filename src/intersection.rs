@@ -1,3 +1,4 @@
+use crate::epsilon::EPSILON;
 use crate::ray::Ray;
 use crate::tuple::*;
 use crate::world::World;
@@ -55,7 +56,7 @@ impl Intersection {
     ) -> PreparedComputations {
         let (object_id, intersection_distance) = intersection.tupled();
         let point = ray.position_at(intersection_distance);
-        let shape = world.objects.iter().find(|&o| o.id == object_id).unwrap();
+        let shape = world.objects.iter().find(|&o| o.id() == object_id).unwrap();
         let eyev = negate_tuple(&ray.direction);
         let (inside, normalv) = {
             let normalv = shape.normal_at(&point);
@@ -69,7 +70,7 @@ impl Intersection {
         };
         // to prevent self shadowing we bump slightly the point in the direction of the normal
         // handpicked epsilon for this context
-        let over_point = add_tuple(&point, &scale_tuple(&normalv, 0.000001));
+        let over_point = add_tuple(&point, &scale_tuple(&normalv, EPSILON));
         PreparedComputations {
             object_id,
             intersection_distance,
@@ -85,12 +86,10 @@ impl Intersection {
 #[cfg(test)]
 mod intersection_tests {
     use crate::intersection::*;
-    use crate::ray::*;
+    use crate::matrix::Matrix;
     use crate::sphere::Sphere;
     use crate::tuple::{point, vector};
     use crate::world::World;
-    use crate::matrix::Matrix;
-    use std::f64::EPSILON;
 
     #[test]
     fn hit_when_all_positive() {
@@ -142,7 +141,7 @@ mod intersection_tests {
         let ray = Ray::new(point(0.0, 0.0, -5.0), vector(0.0, 0.0, 1.0));
         let shape = Sphere::new(1);
         let intersection = Intersection::new(1, 4.0);
-        let w = World::empty().add_object(shape);
+        let w = World::empty().add_object(Box::new(shape));
         let comps = Intersection::prepare_computations(&intersection, &ray, &w);
         assert_eq!(comps.object_id, intersection.object_id);
         assert_eq!(comps.point, point(0.0, 0.0, -1.0));
@@ -156,7 +155,7 @@ mod intersection_tests {
         let ray = Ray::new(point(0.0, 0.0, 0.0), vector(0.0, 0.0, 1.0));
         let shape = Sphere::new(1);
         let intersection = Intersection::new(1, 1.0);
-        let w = World::empty().add_object(shape);
+        let w = World::empty().add_object(Box::new(shape));
         let comps = Intersection::prepare_computations(&intersection, &ray, &w);
         assert_eq!(comps.object_id, intersection.object_id);
         assert_eq!(comps.point, point(0.0, 0.0, 1.0));
@@ -168,11 +167,11 @@ mod intersection_tests {
     #[test]
     fn the_hit_offset_the_point_to_avoid_self_shadowing() {
         let ray = Ray::new(point(0.0, 0.0, -5.0), vector(0.0, 0.0, 1.0));
-        let shape = Sphere::new(1).set_transform(Matrix::translation(0.0,0.0,1.0));
+        let shape = Sphere::new(1).set_transform(Matrix::translation(0.0, 0.0, 1.0));
         let intersection = Intersection::new(1, 5.0);
-        let w = World::empty().add_object(shape);
+        let w = World::empty().add_object(Box::new(shape));
         let comps = Intersection::prepare_computations(&intersection, &ray, &w);
-        assert_eq!(comps.over_point.2 < -(EPSILON / 2.0), true);
+        assert_eq!(comps.over_point.2 < -(f64::EPSILON / 2.0), true);
         assert_eq!(comps.point.2 > comps.over_point.2, true);
     }
 }

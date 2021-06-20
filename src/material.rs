@@ -1,5 +1,4 @@
 use crate::color::*;
-use crate::tuple::*;
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub struct Material {
@@ -13,7 +12,7 @@ pub struct Material {
 impl Material {
     pub fn default() -> Material {
         Material {
-            color: Color::make(1.0, 1.0, 1.0),
+            color: WHITE,
             ambient: 0.1,
             diffuse: 0.9,
             specular: 0.9,
@@ -36,7 +35,6 @@ impl Material {
 mod material_tests {
     use super::Material;
     use crate::color::*;
-    use crate::tuple::*;
 
     #[test]
     fn default_material() {

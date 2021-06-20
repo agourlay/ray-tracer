@@ -1,11 +1,9 @@
 use crate::camera::*;
-use crate::canvas::Canvas;
 use crate::color::Color;
-use crate::intersection::Intersection;
 use crate::light::Light;
 use crate::material::Material;
 use crate::matrix::Matrix;
-use crate::ray::Ray;
+use crate::plane::Plane;
 use crate::sphere::Sphere;
 use crate::transformation::*;
 use crate::tuple::*;
@@ -14,27 +12,7 @@ use std::f64::consts::{FRAC_PI_2, FRAC_PI_3, FRAC_PI_4};
 use std::io::Result;
 
 pub fn demo() -> Result<()> {
-    let floor = Sphere::new(1)
-        .set_transform(Matrix::scaling(10.0, 0.01, 10.0))
-        .set_material(Material::new(Color::make(1.0, 0.9, 0.9), 0.9, 0.0));
-
-    let left_wall = Sphere::new(2)
-        .set_transform(
-            Matrix::translation(0.0, 0.0, 5.0)
-                .multiply(&Matrix::rotate_y(-FRAC_PI_4))
-                .multiply(&Matrix::rotate_x(FRAC_PI_2))
-                .multiply(&Matrix::scaling(10.0, 0.01, 10.0)),
-        )
-        .set_material(floor.material);
-
-    let right_wall = Sphere::new(3)
-        .set_transform(
-            Matrix::translation(0.0, 0.0, 5.0)
-                .multiply(&Matrix::rotate_y(FRAC_PI_4))
-                .multiply(&Matrix::rotate_x(FRAC_PI_2))
-                .multiply(&Matrix::scaling(10.0, 0.01, 10.0)),
-        )
-        .set_material(floor.material);
+    let floor = Plane::new(1);
 
     let middle_sphere = Sphere::new(4)
         .set_transform(Matrix::translation(-0.5, 1.0, 0.5))
@@ -58,12 +36,10 @@ pub fn demo() -> Result<()> {
 
     let world = World::empty()
         .set_light(light)
-        .add_object(floor)
-        .add_object(left_wall)
-        .add_object(right_wall)
-        .add_object(middle_sphere)
-        .add_object(right_sphere)
-        .add_object(left_sphere);
+        .add_object(Box::new(floor))
+        .add_object(Box::new(middle_sphere))
+        .add_object(Box::new(right_sphere))
+        .add_object(Box::new(left_sphere));
 
     let camera = Camera::new(10000, 5000, FRAC_PI_3).set_transform(view_transform(
         &point(0.0, 1.5, -5.0),

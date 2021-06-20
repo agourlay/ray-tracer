@@ -24,11 +24,11 @@ impl Light {
         normalv: &Tuple,
         in_shadow: bool,
     ) -> Color {
-        // combine the surface color with the light's color/intensity​
+        // combine the surface color with the light's color/intensity
         let effective_color = material.color.multiply(&self.intensity);
-        // find the direction to the light source​
+        // find the direction to the light source
         let lightv = vector_normalize(&subtract_tuple(&self.position, point));
-        // compute the ambient contribution​
+        // compute the ambient contribution
         let ambient = effective_color.multiply_value(material.ambient);
 
         let mut diffuse = Color::default();
@@ -36,8 +36,8 @@ impl Light {
 
         // light can't contribute to diffuse & specular
         if !in_shadow {
-            // light_dot_normal represents the cosine of the angle between the​ light vector and the normal vector.
-            // A negative number means the​ light is on the other side of the surface.​
+            // light_dot_normal represents the cosine of the angle between the light vector and the normal vector.
+            // A negative number means the light is on the other side of the surface.
             let light_dot_normal = vector_dot_product(&lightv, normalv);
 
             if light_dot_normal >= 0.0 {

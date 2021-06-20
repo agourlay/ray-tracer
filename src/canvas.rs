@@ -55,19 +55,19 @@ impl Canvas {
                         let next_line_size = current_line_size + raw_scaled_color_len + 1;
                         if next_line_size <= 69 {
                             // continue line
-                            content_lines.push_str(" ");
+                            content_lines.push(' ');
                             content_lines.push_str(&raw_scaled_color);
                             next_line_size
                         } else {
                             // new line
-                            content_lines.push_str("\n");
+                            content_lines.push('\n');
                             content_lines.push_str(&raw_scaled_color);
                             raw_scaled_color_len
                         }
                     }
                 });
                 // separate lines
-                content_lines.push_str("\n");
+                content_lines.push('\n');
             });
 
         format!("{}\n{}\n ", header, content_lines)

@@ -7,6 +7,32 @@ pub struct Color {
     pub blue: f64,
 }
 
+pub const BLACK: Color = Color {
+    red: 0.,
+    green: 0.,
+    blue: 0.,
+};
+pub const WHITE: Color = Color {
+    red: 1.,
+    green: 1.,
+    blue: 1.,
+};
+pub const RED: Color = Color {
+    red: 1.,
+    green: 0.,
+    blue: 0.,
+};
+pub const GREEN: Color = Color {
+    red: 0.,
+    green: 1.,
+    blue: 0.,
+};
+pub const BLUE: Color = Color {
+    red: 0.,
+    green: 0.,
+    blue: 1.,
+};
+
 impl Color {
     pub fn make(r: f64, g: f64, b: f64) -> Self {
         Color {
@@ -88,13 +114,8 @@ impl From<Tuple> for Color {
 }
 
 impl Default for Color {
-    // TODO make const
     fn default() -> Self {
-        Color {
-            red: 0.0,
-            blue: 0.0,
-            green: 0.0,
-        }
+        BLACK
     }
 }
 

@@ -12,7 +12,7 @@ pub fn tuple_is_vector(t: &Tuple) -> bool {
 }
 
 pub fn tuple_is_point(t: &Tuple) -> bool {
-    (t.3 - (1.0 as f64)).abs() < f64::EPSILON
+    (t.3 - 1.0_f64).abs() < f64::EPSILON
 }
 
 pub fn add_tuple(t1: &Tuple, t2: &Tuple) -> Tuple {
@@ -39,9 +39,9 @@ pub fn point(x: f64, y: f64, z: f64) -> Tuple {
     (x, y, z, 1.0)
 }
 
-// TODO make const?
-pub fn point_zero() -> Tuple {
-    point(0.0, 0.0, 0.0)
+pub const fn point_zero() -> Tuple {
+    // point(0.0, 0.0, 0.0)
+    (0.0, 0.0, 0.0, 1.0)
 }
 
 pub fn vector(x: f64, y: f64, z: f64) -> Tuple {
@@ -49,7 +49,7 @@ pub fn vector(x: f64, y: f64, z: f64) -> Tuple {
 }
 
 pub fn vector_magnitude(v: &Tuple) -> f64 {
-    (v.0.powf(2.0) + v.1.powf(2.0) + v.2.powf(2.0)).sqrt()
+    (v.0.powi(2) + v.1.powi(2) + v.2.powi(2)).sqrt()
 }
 
 pub fn vector_normalize(v: &Tuple) -> Tuple {
