@@ -35,17 +35,11 @@ impl Intersection {
         if intersections.is_empty() {
             None
         } else {
-            let mut all: Vec<(usize, f64)> = intersections
+            intersections
                 .iter()
                 .filter(|i| i.distance > 0.0)
                 .map(|i| i.tupled())
-                .collect();
-            if all.is_empty() {
-                None
-            } else {
-                all.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
-                all.pop()
-            }
+                .max_by(|a, b|b.1.partial_cmp(&a.1).unwrap())
         }
     }
 
