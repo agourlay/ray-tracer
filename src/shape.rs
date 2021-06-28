@@ -7,8 +7,8 @@ use crate::tuple::*;
 
 pub trait Shape {
     fn id(&self) -> usize;
-    fn transform(&self) -> Transformation;
-    fn material(&self) -> Material;
+    fn transform(&self) -> &Transformation;
+    fn material(&self) -> &Material;
     fn local_intersect(&self, local_ray: &Ray) -> Vec<Intersection>;
     fn local_normal_at(&self, local_point: &Tuple) -> Tuple;
 
@@ -75,12 +75,12 @@ mod shape_tests {
             unimplemented!()
         }
 
-        fn transform(&self) -> Transformation {
-            self.transform.clone()
+        fn transform(&self) -> &Transformation {
+            &self.transform
         }
 
-        fn material(&self) -> Material {
-            self.material
+        fn material(&self) -> &Material {
+            &self.material
         }
 
         fn local_intersect(&self, local_ray: &Ray) -> Vec<Intersection> {
@@ -115,7 +115,7 @@ mod shape_tests {
     #[test]
     fn can_set_material() {
         let s = TestShape::new();
-        let default_m = s.material;
+        let default_m = s.material();
         let new_m = Material::new(default_m.color, default_m.diffuse, 1.0);
         let s2 = s.set_material(new_m);
         assert_eq!(s2.material().specular, 1.0)

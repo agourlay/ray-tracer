@@ -7,7 +7,7 @@ use crate::ray::*;
 use crate::shape::Shape;
 use crate::tuple::*;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq)]
 pub struct Sphere {
     pub id: usize,
     center: Tuple,
@@ -48,12 +48,12 @@ impl Shape for Sphere {
         self.id
     }
 
-    fn transform(&self) -> Transformation {
-        self.transform.clone()
+    fn transform(&self) -> &Transformation {
+        &self.transform
     }
 
-    fn material(&self) -> Material {
-        self.material
+    fn material(&self) -> &Material {
+        &self.material
     }
 
     // https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-sphere-intersection
@@ -263,6 +263,12 @@ mod sphere_tests {
             ..Material::default()
         };
         let final_sphere = s.set_material(m);
-        assert_eq!(final_sphere.material, m)
+        assert_eq!(
+            final_sphere.material,
+            Material {
+                ambient: 1.0,
+                ..Material::default()
+            }
+        )
     }
 }

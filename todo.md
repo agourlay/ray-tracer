@@ -4,11 +4,15 @@
   
 - cleanup float comparison in tests (typeclass for approximation with epsilon?)
 - multi-threaded rendering
-- less cloning
 - add progress bar during rendering
 - implement native operators + and * for my types
 - promote a bunch of const marked as todos
 - investigate Vec vs Array for modeling
+- advanced pattern suggestions as the end of chapter 10
+  - radial gradient pattern
+  - nested pattern
+  - blended pattern
+  - perturbed pattern
 - use SIMD for math heavy part
   - matrix multiplication
   - vector dot product

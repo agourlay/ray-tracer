@@ -64,9 +64,9 @@ impl World {
         let mut intersections = Vec::new();
         self.objects.iter().for_each(|o| {
             o.intersect(&ray)
-                .iter()
+                .into_iter()
                 .filter(|i| i.distance > 0.0)
-                .for_each(|i| intersections.push(*i))
+                .for_each(|i| intersections.push(i))
         });
         intersections.sort_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap());
         intersections
@@ -86,7 +86,8 @@ impl World {
                 .iter()
                 .map(|l| {
                     l.lighting(
-                        &shape.material(),
+                        shape.material(),
+                        shape.transform(),
                         &comps.over_point,
                         &comps.eyev,
                         &comps.normalv,

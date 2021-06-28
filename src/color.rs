@@ -32,6 +32,21 @@ pub const BLUE: Color = Color {
     green: 0.,
     blue: 1.,
 };
+pub const AQUA: Color = Color {
+    red: 0.,
+    green: 1.,
+    blue: 1.,
+};
+pub const FUCHSIA: Color = Color {
+    red: 1.,
+    green: 0.,
+    blue: 1.,
+};
+pub const YELLOW: Color = Color {
+    red: 1.,
+    green: 1.,
+    blue: 0.,
+};
 
 impl Color {
     pub fn make(r: f64, g: f64, b: f64) -> Self {

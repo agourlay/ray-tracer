@@ -20,7 +20,7 @@ When the project is complete, you’ll look back and realize you’ve built an e
 - [x] Chapter 7 - Making a Scene
 - [x] Chapter 8 - Shadows
 - [x] Chapter 9 - Planes
-- [ ] Chapter 10 - Patterns
+- [x] Chapter 10 - Patterns
 - [ ] Chapter 11 - Reflection and Refraction
 - [ ] Chapter 12 - Cubes
 - [ ] Chapter 13 - Cylinders
@@ -32,11 +32,8 @@ When the project is complete, you’ll look back and realize you’ve built an e
 
 ## Examples
 
-- chapter 8 on shadows.
-![alt text](scenes/chapter-8.png "Chapter 9")
-
-- chapter 9 on planes.
-![alt text](scenes/chapter-9.png "Chapter 9")
+- chapter 10 on patterns.
+![alt text](scenes/chapter-10.png "Chapter 10")
 
 ## Hacking
 

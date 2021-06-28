@@ -3,7 +3,7 @@ use crate::ray::Ray;
 use crate::tuple::*;
 use crate::world::World;
 
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq)]
 pub struct Intersection {
     pub object_id: usize,
     pub distance: f64,
@@ -39,7 +39,7 @@ impl Intersection {
                 .iter()
                 .filter(|i| i.distance > 0.0)
                 .map(|i| i.tupled())
-                .max_by(|a, b|b.1.partial_cmp(&a.1).unwrap())
+                .max_by(|a, b| b.1.partial_cmp(&a.1).unwrap())
         }
     }
 

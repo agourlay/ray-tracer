@@ -7,7 +7,7 @@ use crate::shape::Shape;
 use crate::tuple::*;
 
 // xz plane
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug)]
 pub struct Plane {
     pub id: usize,
     transform: Transformation,
@@ -22,6 +22,10 @@ impl Plane {
             material: Material::default(),
         }
     }
+
+    pub fn set_material(self, material: Material) -> Plane {
+        Plane { material, ..self }
+    }
 }
 
 impl Shape for Plane {
@@ -29,12 +33,12 @@ impl Shape for Plane {
         self.id
     }
 
-    fn transform(&self) -> Transformation {
-        self.transform.clone()
+    fn transform(&self) -> &Transformation {
+        &self.transform
     }
 
-    fn material(&self) -> Material {
-        self.material
+    fn material(&self) -> &Material {
+        &self.material
     }
 
     fn local_intersect(&self, local_ray: &Ray) -> Vec<Intersection> {

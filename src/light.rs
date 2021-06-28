@@ -1,5 +1,7 @@
 use crate::color::*;
 use crate::material::Material;
+use crate::matrix::Transformation;
+use crate::pattern::Pattern;
 use crate::tuple::*;
 
 #[derive(Debug, PartialEq)]
@@ -19,13 +21,18 @@ impl Light {
     pub fn lighting(
         &self,
         material: &Material,
+        object_transformation: &Transformation,
         point: &Tuple,
         eyev: &Tuple,
         normalv: &Tuple,
         in_shadow: bool,
     ) -> Color {
+        let color = match &material.pattern {
+            None => material.color,
+            Some(p) => p.pattern_at_object(object_transformation, point),
+        };
         // combine the surface color with the light's color/intensity
-        let effective_color = material.color.multiply(&self.intensity);
+        let effective_color = color.multiply(&self.intensity);
         // find the direction to the light source
         let lightv = vector_normalize(&subtract_tuple(&self.position, point));
         // compute the ambient contribution
@@ -59,6 +66,9 @@ mod light_tests {
     use super::Light;
     use crate::color::*;
     use crate::material::Material;
+    use crate::matrix::{Matrix, Transformation};
+    use crate::pattern::Pattern::StripePattern;
+    use crate::pattern::{Pattern, Stripe};
     use crate::tuple::*;
 
     #[test]
@@ -77,7 +87,8 @@ mod light_tests {
         let eye = vector(0.0, 0.0, -1.0);
         let normal = vector(0.0, 0.0, -1.0);
         let light = Light::point_light(point(0.0, 0.0, -10.0), Color::make(1.0, 1.0, 1.0));
-        let result = light.lighting(&m, &p, &eye, &normal, false);
+        let t = Transformation::default();
+        let result = light.lighting(&m, &t, &p, &eye, &normal, false);
         assert_eq!(result, Color::make(1.9, 1.9, 1.9))
     }
 
@@ -89,7 +100,8 @@ mod light_tests {
         let eye = vector(0.0, value, value);
         let normal = vector(0.0, 0.0, -1.0);
         let light = Light::point_light(point(0.0, 0.0, -10.0), Color::make(1.0, 1.0, 1.0));
-        let result = light.lighting(&m, &p, &eye, &normal, false);
+        let t = Transformation::default();
+        let result = light.lighting(&m, &t, &p, &eye, &normal, false);
         assert_eq!(result, Color::make(1.0, 1.0, 1.0))
     }
 
@@ -100,7 +112,8 @@ mod light_tests {
         let eye = vector(0.0, 0.0, -1.0);
         let normal = vector(0.0, 0.0, -1.0);
         let light = Light::point_light(point(0.0, 10.0, -10.0), Color::make(1.0, 1.0, 1.0));
-        let result = light.lighting(&m, &p, &eye, &normal, false);
+        let t = Transformation::default();
+        let result = light.lighting(&m, &t, &p, &eye, &normal, false);
         let value = 0.7363961030678927;
         assert_eq!(result, Color::make(value, value, value))
     }
@@ -112,7 +125,8 @@ mod light_tests {
         let eye = vector(0.0, 0.0, -1.0);
         let normal = vector(0.0, 0.0, -1.0);
         let light = Light::point_light(point(0.0, 0.0, 10.0), Color::make(1.0, 1.0, 1.0));
-        let result = light.lighting(&m, &p, &eye, &normal, false);
+        let t = Transformation::default();
+        let result = light.lighting(&m, &t, &p, &eye, &normal, false);
         assert_eq!(result, Color::make(0.1, 0.1, 0.1))
     }
 
@@ -123,7 +137,33 @@ mod light_tests {
         let eye = vector(0.0, 0.0, -1.0);
         let normal = vector(0.0, 0.0, -1.0);
         let light = Light::point_light(point(0.0, 0.0, -10.0), Color::make(1.0, 1.0, 1.0));
-        let result = light.lighting(&m, &p, &eye, &normal, true);
+        let t = Transformation::default();
+        let result = light.lighting(&m, &t, &p, &eye, &normal, true);
         assert_eq!(result, Color::make(0.1, 0.1, 0.1))
+    }
+
+    #[test]
+    fn lighting_with_pattern_applied() {
+        let p = Pattern::new_stripe(WHITE, BLACK, Matrix::identity());
+        let m = Material {
+            color: WHITE,
+            ambient: 1.,
+            diffuse: 0.,
+            specular: 0.,
+            shininess: 200.0,
+            pattern: Some(p),
+        };
+        let eye = vector(0.0, 0.0, -1.0);
+        let normal = vector(0.0, 0.0, -1.0);
+        let light = Light::point_light(point(0.0, 0.0, -10.0), Color::make(1.0, 1.0, 1.0));
+        let t = Transformation::default();
+
+        let p1 = point(0.9, 0.0, 0.0);
+        let r1 = light.lighting(&m, &t, &p1, &eye, &normal, true);
+        assert_eq!(r1, Color::make(1., 1., 1.));
+
+        let p2 = point(1.1, 0.0, 0.0);
+        let r2 = light.lighting(&m, &t, &p2, &eye, &normal, true);
+        assert_eq!(r2, Color::make(0., 0., 0.))
     }
 }

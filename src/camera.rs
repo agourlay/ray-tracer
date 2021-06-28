@@ -10,6 +10,7 @@ pub struct Camera {
     field_of_view: f64,
     transform: Matrix,
     transform_inverse: Matrix, // cache inverse
+    origin: Tuple, // cache
     pixel_size: f64,
     half_width: f64,
     half_height: f64,
@@ -27,6 +28,7 @@ impl Camera {
         let pixel_size = (half_width * 2.0) / hsize as f64;
         let transform = Matrix::identity();
         let transform_inverse = Matrix::inverse(&transform);
+        let origin = transform_inverse.multiply_tuple(&point_zero());
         Camera {
             hsize,
             vsize,
@@ -36,13 +38,17 @@ impl Camera {
             pixel_size,
             half_width,
             half_height,
+            origin
         }
     }
 
     pub fn set_transform(self, transform: Matrix) -> Camera {
+        let transform_inverse = Matrix::inverse(&transform);
+        let origin = transform_inverse.multiply_tuple(&point_zero());
         Camera {
-            transform_inverse: Matrix::inverse(&transform),
+            transform_inverse,
             transform,
+            origin,
             ..self
         }
     }
@@ -61,7 +67,7 @@ impl Camera {
         let pixel = self
             .transform_inverse
             .multiply_tuple(&point(world_x, world_y, -1.0));
-        let origin = self.transform_inverse.multiply_tuple(&point_zero());
+        let origin = self.origin;
         let direction = vector_normalize(&subtract_tuple(&pixel, &origin));
         Ray::new(origin, direction)
     }

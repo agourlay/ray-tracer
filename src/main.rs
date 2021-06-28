@@ -7,6 +7,7 @@ mod intersection;
 mod light;
 mod material;
 mod matrix;
+mod pattern;
 mod plane;
 mod projectile;
 mod ray;
