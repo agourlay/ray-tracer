@@ -63,7 +63,7 @@ impl World {
     pub fn intersect_with_ray(&self, ray: &Ray) -> Vec<Intersection> {
         let mut intersections = Vec::new();
         self.objects.iter().for_each(|o| {
-            o.intersect(&ray)
+            o.intersect(ray)
                 .into_iter()
                 .filter(|i| i.distance > 0.0)
                 .for_each(|i| intersections.push(i))

@@ -13,7 +13,7 @@ pub trait Shape {
     fn local_normal_at(&self, local_point: &Tuple) -> Tuple;
 
     fn normal_at(&self, p: &Tuple) -> Tuple {
-        let local_point = self.transform().inverse.multiply_tuple(&p);
+        let local_point = self.transform().inverse.multiply_tuple(p);
         let local_normal = self.local_normal_at(&local_point);
         let world_normal = self
             .transform()

@@ -2,7 +2,7 @@ use crate::camera::*;
 use crate::color::*;
 use crate::light::Light;
 use crate::material::Material;
-use crate::matrix::{Matrix, Transformation};
+use crate::matrix::Matrix;
 use crate::pattern::Pattern;
 use crate::plane::Plane;
 use crate::sphere::Sphere;

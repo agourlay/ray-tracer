@@ -1,7 +1,6 @@
 use crate::color::*;
 use crate::material::Material;
 use crate::matrix::Transformation;
-use crate::pattern::Pattern;
 use crate::tuple::*;
 
 #[derive(Debug, PartialEq)]

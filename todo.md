@@ -8,6 +8,9 @@
 - implement native operators + and * for my types
 - promote a bunch of const marked as todos
 - investigate Vec vs Array for modeling
+- bench hot parts with https://bheisler.github.io/criterion.rs/book/index.html
+- test target-cpu=native
+  - RUSTFLAGS="-C target-cpu=native" cargo build --release
 - advanced pattern suggestions as the end of chapter 10
   - radial gradient pattern
   - nested pattern
@@ -28,10 +31,7 @@
   - https://bheisler.github.io/post/writing-raytracer-in-rust-part-1/
   - https://bheisler.github.io/post/writing-raytracer-in-rust-part-2/
   - https://bheisler.github.io/post/writing-raytracer-in-rust-part-3/
-  
-- Building a Ray Tracer (7 videos)
-  - https://www.youtube.com/playlist?list=PLctja8lh-0MdlbFXjmBoFn_1hiK4qkVqe
-  
+
 - https://github.com/RayTracing/raytracing.github.io
   - https://raytracing.github.io/books/RayTracingInOneWeekend.html
   - https://raytracing.github.io/books/RayTracingTheNextWeek.html

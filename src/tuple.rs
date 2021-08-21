@@ -53,7 +53,7 @@ pub fn vector_magnitude(v: &Tuple) -> f64 {
 }
 
 pub fn vector_normalize(v: &Tuple) -> Tuple {
-    let mag = vector_magnitude(&v);
+    let mag = vector_magnitude(v);
     (v.0 / mag, v.1 / mag, v.2 / mag, 0.0)
 }
 
