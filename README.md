@@ -1,4 +1,5 @@
 # ray-tracer
+[![Build](https://github.com/agourlay/ray-tracer/actions/workflows/ci.yml/badge.svg)](https://github.com/agourlay/ray-tracer/actions/workflows/ci.yml)
 
 Implementation in Rust of a ray tracer following [The Ray Tracer Challenge](https://www.goodreads.com/book/show/39933047-the-ray-tracer-challenge) book.
 
