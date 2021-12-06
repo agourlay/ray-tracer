@@ -4,6 +4,7 @@
   
 - cleanup float comparison in tests (typeclass for approximation with epsilon?)
 - multi-threaded rendering
+- render in memory and display with the windows/pixels crates
 - add progress bar during rendering
 - implement native operators + and * for my types
 - promote a bunch of const marked as todos
@@ -24,13 +25,17 @@
   - https://github.com/magnusstrale/raytracer
   - https://github.com/Dalamar42/rayt
   - https://github.com/sungiant/sdf
+  - https://github.com/melvic-ybanez/erena
+  - https://github.com/jakobwesthoff/the_ray_tracer_challenge_in_rust
   
-## More resources
+## More resources to check later
 
 - Writing a Ray tracer in Rust
   - https://bheisler.github.io/post/writing-raytracer-in-rust-part-1/
   - https://bheisler.github.io/post/writing-raytracer-in-rust-part-2/
   - https://bheisler.github.io/post/writing-raytracer-in-rust-part-3/
+
+- https://www.youtube.com/playlist?list=PLy68GuC77sUTyOUvDhVboQoOlHoa4XrSO
 
 - https://github.com/RayTracing/raytracing.github.io
   - https://raytracing.github.io/books/RayTracingInOneWeekend.html
