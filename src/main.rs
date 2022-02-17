@@ -19,10 +19,6 @@ mod world;
 
 use std::io::Result;
 
-#[cfg(test)]
-#[macro_use(quickcheck)]
-extern crate quickcheck_macros;
-
 fn main() -> Result<()> {
     use crate::demo::*;
     demo()

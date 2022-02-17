@@ -115,7 +115,7 @@ mod intersection_tests {
             Intersection::new(2, -3.0),
         ];
         let tuple = Intersection::hit(hits);
-        assert_eq!(tuple.is_none(), true)
+        assert!(tuple.is_none())
     }
 
     #[test]
@@ -141,7 +141,7 @@ mod intersection_tests {
         assert_eq!(comps.point, point(0.0, 0.0, -1.0));
         assert_eq!(comps.eyev, vector(0.0, 0.0, -1.0));
         assert_eq!(comps.normalv, vector(0.0, 0.0, -1.0));
-        assert_eq!(comps.inside, false);
+        assert!(!comps.inside);
     }
 
     #[test]
@@ -155,7 +155,7 @@ mod intersection_tests {
         assert_eq!(comps.point, point(0.0, 0.0, 1.0));
         assert_eq!(comps.eyev, vector(0.0, 0.0, -1.0));
         assert_eq!(comps.normalv, vector(0.0, 0.0, -1.0));
-        assert_eq!(comps.inside, true);
+        assert!(comps.inside);
     }
 
     #[test]
@@ -165,7 +165,7 @@ mod intersection_tests {
         let intersection = Intersection::new(1, 5.0);
         let w = World::empty().add_object(Box::new(shape));
         let comps = Intersection::prepare_computations(&intersection, &ray, &w);
-        assert_eq!(comps.over_point.2 < -(f64::EPSILON / 2.0), true);
-        assert_eq!(comps.point.2 > comps.over_point.2, true);
+        assert!(comps.over_point.2 < -(f64::EPSILON / 2.0));
+        assert!(comps.point.2 > comps.over_point.2);
     }
 }

@@ -142,8 +142,8 @@ mod world_tests {
     #[test]
     fn creating_empty_world() {
         let world = World::empty();
-        assert_eq!(world.objects.is_empty(), true);
-        assert_eq!(world.lights.is_empty(), true);
+        assert!(world.objects.is_empty());
+        assert!(world.lights.is_empty());
     }
 
     #[test]
@@ -228,7 +228,7 @@ mod world_tests {
         let w = World::default();
         let p = point(0.0, 10.0, 0.0);
         let l = w.lights.first().unwrap();
-        assert_eq!(false, w.is_shadowed(&p, &l));
+        assert!(!w.is_shadowed(&p, l));
     }
 
     #[test]
@@ -236,7 +236,7 @@ mod world_tests {
         let w = World::default();
         let p = point(10.0, -10.0, 10.0);
         let l = w.lights.first().unwrap();
-        assert_eq!(true, w.is_shadowed(&p, &l));
+        assert!(w.is_shadowed(&p, l));
     }
 
     #[test]
@@ -244,7 +244,7 @@ mod world_tests {
         let w = World::default();
         let p = point(-20.0, 20.0, -20.0);
         let l = w.lights.first().unwrap();
-        assert_eq!(false, w.is_shadowed(&p, &l));
+        assert!(!w.is_shadowed(&p, l));
     }
 
     #[test]
@@ -252,7 +252,7 @@ mod world_tests {
         let w = World::default();
         let p = point(-2.0, 2.0, -2.0);
         let l = w.lights.first().unwrap();
-        assert_eq!(false, w.is_shadowed(&p, &l));
+        assert!(!w.is_shadowed(&p, l));
     }
 
     #[test]

@@ -71,6 +71,6 @@ mod material_tests {
         assert_eq!(material.diffuse, 0.9);
         assert_eq!(material.specular, 0.9);
         assert_eq!(material.shininess, 200.0);
-        assert_eq!(material.pattern.is_none(), true);
+        assert!(material.pattern.is_none());
     }
 }

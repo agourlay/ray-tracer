@@ -55,7 +55,12 @@ pub fn demo() -> Result<()> {
         .set_transform(
             Matrix::translation(-1.5, 0.33, -0.45).multiply(&Matrix::scaling(0.33, 0.33, 0.33)),
         )
-        .set_material(Material::new_with_pattern(Color::make(1.0, 0.8, 0.1), 0.7, 0.3, ring));
+        .set_material(Material::new_with_pattern(
+            Color::make(1.0, 0.8, 0.1),
+            0.7,
+            0.3,
+            ring,
+        ));
 
     let light_position = point(-10.0, 10.0, -10.0);
     let light_color = Color::make(1.0, 1.0, 1.0);

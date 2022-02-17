@@ -294,38 +294,6 @@ mod matrix_tests {
     use crate::matrix::*;
     use crate::tuple::*;
 
-    extern crate quickcheck;
-
-    use self::quickcheck::{Arbitrary, Gen};
-
-    impl Arbitrary for Matrix {
-        fn arbitrary(g: &mut Gen) -> Matrix {
-            let aa = f64::arbitrary(g);
-            let ab = f64::arbitrary(g);
-            let ac = f64::arbitrary(g);
-            let ad = f64::arbitrary(g);
-            let ba = f64::arbitrary(g);
-            let bb = f64::arbitrary(g);
-            let bc = f64::arbitrary(g);
-            let bd = f64::arbitrary(g);
-            let ca = f64::arbitrary(g);
-            let cb = f64::arbitrary(g);
-            let cc = f64::arbitrary(g);
-            let cd = f64::arbitrary(g);
-            let da = f64::arbitrary(g);
-            let db = f64::arbitrary(g);
-            let dc = f64::arbitrary(g);
-            let dd = f64::arbitrary(g);
-
-            Matrix {
-                size: 4,
-                content: vec![
-                    aa, ab, ac, ad, ba, bb, bc, bd, ca, cb, cc, cd, da, db, dc, dd,
-                ],
-            }
-        }
-    }
-
     #[test]
     fn make_matrix_4_valid() {
         let m = Matrix::make_matrix_4(
@@ -428,13 +396,6 @@ mod matrix_tests {
         );
         let res = identity.multiply(&m1);
         assert_eq!(res, m1);
-    }
-
-    //TODO fix float epsilon eq
-    //#[quickcheck]
-    fn matrix_multiply_identity_prop(m: Matrix) -> bool {
-        let identity = Matrix::identity();
-        m.multiply(&identity) == m && identity.multiply(&m) == m
     }
 
     #[test]

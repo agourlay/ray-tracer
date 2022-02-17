@@ -189,12 +189,10 @@ impl Stripe {
             } else {
                 self.a
             }
+        } else if x % 2. < 1. {
+            self.a
         } else {
-            if x % 2. < 1. {
-                self.a
-            } else {
-                self.b
-            }
+            self.b
         }
     }
 }
@@ -202,7 +200,7 @@ impl Stripe {
 #[cfg(test)]
 mod pattern_tests {
     use crate::color::{Color, BLACK, WHITE};
-    use crate::matrix::{Matrix, Transformation};
+    use crate::matrix::Matrix;
     use crate::pattern::*;
     use crate::shape::Shape;
     use crate::sphere::Sphere;

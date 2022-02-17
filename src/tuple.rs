@@ -83,32 +83,32 @@ mod tuple_tests {
 
     #[test]
     fn is_vector() {
-        assert_eq!(tuple_is_vector(&(1.0, 2.0, -3.0, 0.0)), true);
+        assert!(tuple_is_vector(&(1.0, 2.0, -3.0, 0.0)));
     }
 
     #[test]
     fn is_not_vector() {
-        assert_eq!(tuple_is_vector(&(1.0, 2.0, -3.0, 1.0)), false);
+        assert!(!tuple_is_vector(&(1.0, 2.0, -3.0, 1.0)));
     }
 
     #[test]
     fn vector_is_point() {
-        assert_eq!(tuple_is_vector(&vector(1.0, 2.0, -3.0)), true);
+        assert!(tuple_is_vector(&vector(1.0, 2.0, -3.0)));
     }
 
     #[test]
     fn is_point() {
-        assert_eq!(tuple_is_point(&(1.0, 2.0, -3.0, 1.0)), true);
+        assert!(tuple_is_point(&(1.0, 2.0, -3.0, 1.0)));
     }
 
     #[test]
     fn is_not_point() {
-        assert_eq!(tuple_is_point(&(1.0, 2.0, -3.0, 0.0)), false);
+        assert!(!tuple_is_point(&(1.0, 2.0, -3.0, 0.0)));
     }
 
     #[test]
     fn point_is_point() {
-        assert_eq!(tuple_is_point(&point(1.0, 2.0, -3.0)), true);
+        assert!(tuple_is_point(&point(1.0, 2.0, -3.0)));
     }
 
     #[test]

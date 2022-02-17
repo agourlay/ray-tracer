@@ -66,8 +66,7 @@ mod light_tests {
     use crate::color::*;
     use crate::material::Material;
     use crate::matrix::{Matrix, Transformation};
-    use crate::pattern::Pattern::StripePattern;
-    use crate::pattern::{Pattern, Stripe};
+    use crate::pattern::Pattern;
     use crate::tuple::*;
 
     #[test]

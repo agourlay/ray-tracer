@@ -27,6 +27,7 @@
   - https://github.com/sungiant/sdf
   - https://github.com/melvic-ybanez/erena
   - https://github.com/jakobwesthoff/the_ray_tracer_challenge_in_rust
+  - https://github.com/dps/rust-raytracer
   
 ## More resources to check later
 

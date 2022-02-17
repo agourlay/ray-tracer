@@ -10,7 +10,7 @@ pub struct Camera {
     field_of_view: f64,
     transform: Matrix,
     transform_inverse: Matrix, // cache inverse
-    origin: Tuple, // cache
+    origin: Tuple,             // cache
     pixel_size: f64,
     half_width: f64,
     half_height: f64,
@@ -38,7 +38,7 @@ impl Camera {
             pixel_size,
             half_width,
             half_height,
-            origin
+            origin,
         }
     }
 

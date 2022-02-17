@@ -61,12 +61,9 @@ impl Shape for Plane {
 
 #[cfg(test)]
 mod plane_tests {
-    use crate::material::Material;
-    use crate::matrix::Matrix;
     use crate::plane::Plane;
     use crate::ray::*;
     use crate::shape::Shape;
-    use crate::sphere::*;
     use crate::tuple::*;
 
     #[test]
@@ -86,7 +83,7 @@ mod plane_tests {
         let p = Plane::new(1);
         let ray = Ray::new(point(0.0, 10.0, 0.0), vector(0.0, 0.0, 1.0));
         let intersections = p.local_intersect(&ray);
-        assert_eq!(intersections.is_empty(), true)
+        assert!(intersections.is_empty())
     }
 
     #[test]
@@ -94,7 +91,7 @@ mod plane_tests {
         let p = Plane::new(1);
         let ray = Ray::new(point(0.0, 0.0, 0.0), vector(0.0, 0.0, 1.0));
         let intersections = p.local_intersect(&ray);
-        assert_eq!(intersections.is_empty(), true)
+        assert!(intersections.is_empty())
     }
 
     #[test]
